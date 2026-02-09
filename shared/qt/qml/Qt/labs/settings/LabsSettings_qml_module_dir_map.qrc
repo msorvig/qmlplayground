@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/qt-project.org/imports/Qt/labs/settings">/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase/qml/Qt/labs/settings</file>
+
+  </qresource>
+</RCC>

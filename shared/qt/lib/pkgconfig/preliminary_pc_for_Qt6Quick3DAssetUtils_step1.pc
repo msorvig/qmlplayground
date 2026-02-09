@@ -1,0 +1,14 @@
+prefix=/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase
+exec_prefix=${prefix}
+bindir=${prefix}/bin
+libexecdir=${prefix}/libexec
+libdir=${prefix}/lib
+includedir=${prefix}/include
+$<$<BOOL:>:mkspecsdir=${prefix}/mkspecs>
+$<1: >
+Name: Qt6 Quick3DAssetUtils
+Description: Qt Quick3DAssetUtils module
+Version: 6.11.1
+Libs: -L${libdir} -lQt6Quick3DAssetUtils $<$<BOOL:loose_link_options-NOTFOUND>:$<JOIN:$<REMOVE_DUPLICATES:loose_link_options-NOTFOUND>, >> $<JOIN:$<REMOVE_DUPLICATES:>, >
+Cflags: $<$<BOOL:${includedir}/QtQuick3DAssetUtils;${includedir}>:-I$<JOIN:$<REMOVE_DUPLICATES:${includedir}/QtQuick3DAssetUtils;${includedir}>, -I>> $<$<BOOL:QT_QUICK3DASSETUTILS_LIB>:-D$<JOIN:$<REMOVE_DUPLICATES:QT_QUICK3DASSETUTILS_LIB>, -D>>
+Requires: $<JOIN:$<REMOVE_DUPLICATES:Qt6Core;Qt6Gui;Qt6Quick>, >

@@ -1,0 +1,14 @@
+prefix=/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase
+exec_prefix=${prefix}
+bindir=${prefix}/bin
+libexecdir=${prefix}/libexec
+libdir=${prefix}/lib
+includedir=${prefix}/include
+$<$<BOOL:>:mkspecsdir=${prefix}/mkspecs>
+$<1: >
+Name: Qt6 QuickControls2Imagine
+Description: Qt QuickControls2Imagine module
+Version: 6.11.1
+Libs: -L${libdir} -lQt6QuickControls2Imagine $<$<BOOL:loose_link_options-NOTFOUND>:$<JOIN:$<REMOVE_DUPLICATES:loose_link_options-NOTFOUND>, >> $<JOIN:$<REMOVE_DUPLICATES:>, >
+Cflags: $<$<BOOL:${includedir}/QtQuickControls2Imagine;${includedir}>:-I$<JOIN:$<REMOVE_DUPLICATES:${includedir}/QtQuickControls2Imagine;${includedir}>, -I>> $<$<BOOL:QT_QUICKCONTROLS2IMAGINE_LIB>:-D$<JOIN:$<REMOVE_DUPLICATES:QT_QUICKCONTROLS2IMAGINE_LIB>, -D>>
+Requires: $<JOIN:$<REMOVE_DUPLICATES:>, >

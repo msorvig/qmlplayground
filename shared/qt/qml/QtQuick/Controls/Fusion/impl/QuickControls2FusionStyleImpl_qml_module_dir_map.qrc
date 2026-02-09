@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/qt-project.org/imports/QtQuick/Controls/Fusion/impl">/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase/qml/QtQuick/Controls/Fusion/impl</file>
+
+  </qresource>
+</RCC>

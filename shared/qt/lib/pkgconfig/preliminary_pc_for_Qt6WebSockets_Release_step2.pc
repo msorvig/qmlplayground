@@ -1,0 +1,14 @@
+prefix=/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase
+exec_prefix=${prefix}
+bindir=${prefix}/bin
+libexecdir=${prefix}/libexec
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+ 
+Name: Qt6 WebSockets
+Description: Qt WebSockets module
+Version: 6.11.1
+Libs: -L${libdir} -lQt6WebSockets  
+Cflags: -I${includedir}/QtWebSockets -I${includedir} -DQT_WEBSOCKETS_LIB
+Requires: Qt6Core Qt6Network

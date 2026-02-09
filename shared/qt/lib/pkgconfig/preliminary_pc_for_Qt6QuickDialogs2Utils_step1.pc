@@ -1,0 +1,14 @@
+prefix=/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase
+exec_prefix=${prefix}
+bindir=${prefix}/bin
+libexecdir=${prefix}/libexec
+libdir=${prefix}/lib
+includedir=${prefix}/include
+$<$<BOOL:>:mkspecsdir=${prefix}/mkspecs>
+$<1: >
+Name: Qt6 QuickDialogs2Utils
+Description: Qt QuickDialogs2Utils module
+Version: 6.11.1
+Libs: -L${libdir} -lQt6QuickDialogs2Utils $<$<BOOL:loose_link_options-NOTFOUND>:$<JOIN:$<REMOVE_DUPLICATES:loose_link_options-NOTFOUND>, >> $<JOIN:$<REMOVE_DUPLICATES:>, >
+Cflags: $<$<BOOL:${includedir}/QtQuickDialogs2Utils;${includedir}>:-I$<JOIN:$<REMOVE_DUPLICATES:${includedir}/QtQuickDialogs2Utils;${includedir}>, -I>> $<$<BOOL:QT_QUICKDIALOGS2UTILS_LIB>:-D$<JOIN:$<REMOVE_DUPLICATES:QT_QUICKDIALOGS2UTILS_LIB>, -D>>
+Requires: $<JOIN:$<REMOVE_DUPLICATES:Qt6Core>, >

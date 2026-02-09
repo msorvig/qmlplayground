@@ -1,0 +1,12 @@
+prefix=/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase
+exec_prefix=${prefix}
+bindir=${prefix}/bin
+libexecdir=${prefix}/libexec
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: Qt6 Quick3DHelpersImpl
+Description: Qt Quick3DHelpersImpl module
+Version: 6.11.1
+Libs: -L${libdir} -lQt6Quick3DHelpersImpl
+Cflags: -I${includedir}/QtQuick3DHelpersImpl -I${includedir} -DQT_QUICK3DHELPERSIMPL_LIB

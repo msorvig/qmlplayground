@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/qt-project.org/imports/QtQuick/LocalStorage">/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase/qml/QtQuick/LocalStorage</file>
+
+  </qresource>
+</RCC>

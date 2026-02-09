@@ -1,0 +1,59 @@
+# Copyright (C) 2024 The Qt Company Ltd.
+# SPDX-License-Identifier: BSD-3-Clause
+
+set(__standalone_parts_qt_packages_args
+    QT_MODULE_PACKAGES
+        QmlToolingSettingsPrivate
+        QmlTypeRegistrarPrivate
+        QmlIntegration
+        Qml
+        QmlModels
+        QmlCore
+        QmlNetwork
+        QmlMeta
+        QmlLocalStorage
+        QmlXmlListModel
+        Quick
+        QuickLayouts
+        QuickParticlesPrivate
+        QuickEffects
+        QuickShapes
+        QuickShapesDesignHelpersPrivate
+        QuickVectorImageGeneratorPrivate
+        QuickVectorImage
+        QuickVectorImageHelpers
+        QuickWidgets
+        QuickTemplates2
+        QuickControls2Impl
+        QuickControls2
+        QuickControls2BasicStyleImpl
+        QuickControls2Basic
+        QuickControls2FusionStyleImpl
+        QuickControls2Fusion
+        QuickControls2ImagineStyleImpl
+        QuickControls2Imagine
+        QuickControls2MaterialStyleImpl
+        QuickControls2Material
+        QuickControls2UniversalStyleImpl
+        QuickControls2Universal
+        QuickControls2FluentWinUI3StyleImpl
+        LabsSynchronizer
+        LabsSettings
+        LabsQmlModels
+        LabsFolderListModel
+        LabsAnimation
+        LabsPlatform
+        LabsWavefrontMesh
+        LabsStyleKit
+        LabsStyleKitImpl
+        QuickDialogs2Utils
+        QuickDialogs2QuickImpl
+        QuickDialogs2
+        QmlCompiler
+        QmlDomPrivate
+        QmlFormatPrivate
+        QuickTest
+        QuickTestUtilsPrivate
+
+)
+qt_internal_find_standalone_parts_qt_packages(__standalone_parts_qt_packages_args)

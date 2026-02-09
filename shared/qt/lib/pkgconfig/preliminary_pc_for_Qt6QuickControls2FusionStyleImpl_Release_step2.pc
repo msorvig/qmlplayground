@@ -1,0 +1,14 @@
+prefix=/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase
+exec_prefix=${prefix}
+bindir=${prefix}/bin
+libexecdir=${prefix}/libexec
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+ 
+Name: Qt6 QuickControls2FusionStyleImpl
+Description: Qt QuickControls2FusionStyleImpl module
+Version: 6.11.1
+Libs: -L${libdir} -lQt6QuickControls2FusionStyleImpl  
+Cflags: -I${includedir}/QtQuickControls2FusionStyleImpl -I${includedir} -DQT_QUICKCONTROLS2FUSIONSTYLEIMPL_LIB
+Requires: 

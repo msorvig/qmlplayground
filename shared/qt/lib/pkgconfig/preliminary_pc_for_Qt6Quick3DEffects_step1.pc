@@ -1,0 +1,14 @@
+prefix=/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase
+exec_prefix=${prefix}
+bindir=${prefix}/bin
+libexecdir=${prefix}/libexec
+libdir=${prefix}/lib
+includedir=${prefix}/include
+$<$<BOOL:>:mkspecsdir=${prefix}/mkspecs>
+$<1: >
+Name: Qt6 Quick3DEffects
+Description: Qt Quick3DEffects module
+Version: 6.11.1
+Libs: -L${libdir} -lQt6Quick3DEffects $<$<BOOL:loose_link_options-NOTFOUND>:$<JOIN:$<REMOVE_DUPLICATES:loose_link_options-NOTFOUND>, >> $<JOIN:$<REMOVE_DUPLICATES:>, >
+Cflags: $<$<BOOL:loose_${includedir}_dirs-NOTFOUND>:-I$<JOIN:$<REMOVE_DUPLICATES:loose_${includedir}_dirs-NOTFOUND>, -I>> $<$<BOOL:QT_QUICK3DEFFECTS_LIB>:-D$<JOIN:$<REMOVE_DUPLICATES:QT_QUICK3DEFFECTS_LIB>, -D>>
+Requires: $<JOIN:$<REMOVE_DUPLICATES:>, >

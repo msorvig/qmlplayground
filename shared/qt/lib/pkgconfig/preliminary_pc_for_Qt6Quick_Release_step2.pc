@@ -1,0 +1,14 @@
+prefix=/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase
+exec_prefix=${prefix}
+bindir=${prefix}/bin
+libexecdir=${prefix}/libexec
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+ 
+Name: Qt6 Quick
+Description: Qt Quick module
+Version: 6.11.1
+Libs: -L${libdir} -lQt6Quick  
+Cflags: -I${includedir}/QtQuick -I${includedir} -DQT_QUICK_LIB
+Requires: Qt6OpenGL Qt6Core Qt6Gui Qt6Qml

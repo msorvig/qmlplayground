@@ -1,0 +1,14 @@
+prefix=/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase
+exec_prefix=${prefix}
+bindir=${prefix}/bin
+libexecdir=${prefix}/libexec
+libdir=${prefix}/lib
+includedir=${prefix}/include
+$<$<BOOL:>:mkspecsdir=${prefix}/mkspecs>
+$<1: >
+Name: Qt6 LabsStyleKit
+Description: Qt LabsStyleKit module
+Version: 6.11.1
+Libs: -L${libdir} -lQt6LabsStyleKit $<$<BOOL:loose_link_options-NOTFOUND>:$<JOIN:$<REMOVE_DUPLICATES:loose_link_options-NOTFOUND>, >> $<JOIN:$<REMOVE_DUPLICATES:>, >
+Cflags: $<$<BOOL:${includedir}/QtLabsStyleKit;${includedir}>:-I$<JOIN:$<REMOVE_DUPLICATES:${includedir}/QtLabsStyleKit;${includedir}>, -I>> $<$<BOOL:QT_LABSSTYLEKIT_LIB>:-D$<JOIN:$<REMOVE_DUPLICATES:QT_LABSSTYLEKIT_LIB>, -D>>
+Requires: $<JOIN:$<REMOVE_DUPLICATES:>, >

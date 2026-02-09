@@ -1,0 +1,14 @@
+prefix=/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase
+exec_prefix=${prefix}
+bindir=${prefix}/bin
+libexecdir=${prefix}/libexec
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+ 
+Name: Qt6 UiTools
+Description: Qt UiTools module
+Version: 6.11.1
+Libs: -L${libdir} -lQt6UiTools  
+Cflags: -I${includedir}/QtUiTools -I${includedir} -DQT_UITOOLS_LIB
+Requires: Qt6Core Qt6Gui Qt6Widgets Qt6OpenGLWidgets

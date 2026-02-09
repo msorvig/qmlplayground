@@ -1,0 +1,13 @@
+prefix=/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase
+exec_prefix=${prefix}
+bindir=${prefix}/bin
+libexecdir=${prefix}/libexec
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: Qt6 GraphsWidgets
+Description: Qt GraphsWidgets module
+Version: 6.11.1
+Libs: -L${libdir} -lQt6GraphsWidgets
+Cflags: -I${includedir}/QtGraphsWidgets -I${includedir} -DQT_GRAPHSWIDGETS_LIB
+Requires: Qt6Graphs Qt6QuickWidgets

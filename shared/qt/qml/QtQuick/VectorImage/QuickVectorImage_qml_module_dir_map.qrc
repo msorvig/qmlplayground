@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/qt-project.org/imports/QtQuick/VectorImage">/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase/qml/QtQuick/VectorImage</file>
+
+  </qresource>
+</RCC>

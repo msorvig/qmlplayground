@@ -1,0 +1,13 @@
+prefix=/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase
+exec_prefix=${prefix}
+bindir=${prefix}/bin
+libexecdir=${prefix}/libexec
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: Qt6 Graphs
+Description: Qt Graphs module
+Version: 6.11.1
+Libs: -L${libdir} -lQt6Graphs
+Cflags: -I${includedir}/QtGraphs -I${includedir} -DQT_GRAPHS_LIB
+Requires: Qt6Core Qt6Gui Qt6Quick Qt6Quick3D

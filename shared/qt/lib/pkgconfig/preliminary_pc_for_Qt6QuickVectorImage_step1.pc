@@ -1,0 +1,14 @@
+prefix=/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase
+exec_prefix=${prefix}
+bindir=${prefix}/bin
+libexecdir=${prefix}/libexec
+libdir=${prefix}/lib
+includedir=${prefix}/include
+$<$<BOOL:>:mkspecsdir=${prefix}/mkspecs>
+$<1: >
+Name: Qt6 QuickVectorImage
+Description: Qt QuickVectorImage module
+Version: 6.11.1
+Libs: -L${libdir} -lQt6QuickVectorImage $<$<BOOL:loose_link_options-NOTFOUND>:$<JOIN:$<REMOVE_DUPLICATES:loose_link_options-NOTFOUND>, >> $<JOIN:$<REMOVE_DUPLICATES:>, >
+Cflags: $<$<BOOL:${includedir}/QtQuickVectorImage;${includedir}>:-I$<JOIN:$<REMOVE_DUPLICATES:${includedir}/QtQuickVectorImage;${includedir}>, -I>> $<$<BOOL:QT_QUICKVECTORIMAGE_LIB>:-D$<JOIN:$<REMOVE_DUPLICATES:QT_QUICKVECTORIMAGE_LIB>, -D>>
+Requires: $<JOIN:$<REMOVE_DUPLICATES:>, >
