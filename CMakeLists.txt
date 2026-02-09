@@ -51,9 +51,11 @@ if(EMSCRIPTEN)
 
         # Copy build artifacts
         COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_BINARY_DIR}/qmlruntime_wasm.wasm
             ${CMAKE_BINARY_DIR}/qtloader.js
             ${DEPLOY_DIR}/
+
+        # Optimize wasm for size
+        COMMAND wasm-opt -Oz ${CMAKE_BINARY_DIR}/qmlruntime_wasm.wasm -o ${DEPLOY_DIR}/qmlruntime_wasm.wasm
 
         # Copy source files
         COMMAND ${CMAKE_COMMAND} -E copy
