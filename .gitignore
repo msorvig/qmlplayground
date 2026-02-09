@@ -1,0 +1,29 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Qt Creator
+*.pro.user
+*.qmlc
+*.jsc
+
+# Compiled
+*.o
+*.obj
+*.wasm
+*.js.map
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Deploy directory (committed on gh_pages, not main)
+deploy/

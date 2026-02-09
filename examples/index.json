@@ -1,0 +1,10 @@
+[
+    { "name": "Hello World", "file": "hello.qml" },
+    { "name": "Animation", "file": "animation.qml" },
+    { "name": "Mouse Area", "file": "mousearea.qml" },
+    { "name": "Controls", "file": "controls.qml" },
+    { "name": "3D Cube", "file": "cube3d.qml" },
+    { "name": "3D Sphere", "file": "sphere3d.qml" },
+    { "name": "Bar Graph", "file": "bargraph.qml" },
+    { "name": "Line Graph", "file": "linegraph.qml" }
+]
