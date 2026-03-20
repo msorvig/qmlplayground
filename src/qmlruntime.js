@@ -1,15 +1,28 @@
 // QmlRuntime - JavaScript wrapper for Qt QML WebAssembly runtime
 
-import { qtLoad } from './qtloader.js';
-import { qmlruntime_wasm_entry } from './qmlruntime_wasm.js';
+const buildModes = {
+    static: { basePath: 'static', shared: false },
+    shared: { basePath: 'shared', shared: true },
+};
 
 class QmlRuntime extends EventTarget {
-    constructor(container) {
+    constructor(container, config = {}) {
         super();
+        const {
+            mode = 'static',
+            loggingRules = '',
+        } = config;
+
         this.container = container;
+        this.mode = mode;
+        this.loggingRules = loggingRules;
+        const modeConfig = buildModes[mode] || buildModes.static;
+        this._basePath = modeConfig.basePath;
+        this._shared = modeConfig.shared;
         this.instance = null;
         this.ready = false;
         this._loadStartTime = null;
+        this._resizeObserver = null;
     }
 
     // Load the Qt runtime
@@ -18,26 +31,49 @@ class QmlRuntime extends EventTarget {
         this._emit('loading');
 
         try {
+            const [{ qtLoad }, { qmlruntime_wasm_entry }] = await Promise.all([
+                import(`./${this._basePath}/qtloader.js`),
+                import(`./${this._basePath}/qmlruntime_wasm.js`),
+            ]);
+
+            const qtConfig = {
+                onLoaded: () => this._emit('qtloaded'),
+                onExit: (data) => this._emit('exit', { data }),
+                entryFunction: qmlruntime_wasm_entry,
+                containerElements: [this.container],
+            };
+
+            if (this._shared) {
+                qtConfig.qtdir = `${this._basePath}/qt`;
+                qtConfig.preload = [`${this._basePath}/qt_plugins.json`];
+            }
+
+            const env = {};
+            if (this._shared)
+                env.QML_IMPORT_PATH = `${this._basePath}/qt/qml`;
+            if (this.loggingRules)
+                env.QT_LOGGING_RULES = this.loggingRules.split('\n').map(s => s.trim()).filter(Boolean).join(';');
+            if (Object.keys(env).length > 0)
+                qtConfig.environment = env;
+
             this.instance = await qtLoad({
-                locateFile: (path) => path,
-                qt: {
-                    onLoaded: () => this._emit('qtloaded'),
-                    onExit: (data) => this._emit('exit', { data }),
-                    entryFunction: qmlruntime_wasm_entry,
-                    containerElements: [this.container],
-                }
+                locateFile: (path) => path.endsWith('.so') ? path : `${this._basePath}/${path}`,
+                qt: qtConfig,
             });
 
             // Set up callbacks
             this.instance.setOnError((line, column, message) => {
+                console.log('[qmlruntime] onError:', line, column, message);
                 this._emit('error', { line, column, message });
             });
 
             this.instance.setOnWarning((line, column, message) => {
+                console.log('[qmlruntime] onWarning:', line, column, message);
                 this._emit('warning', { line, column, message });
             });
 
             this.instance.setOnLoaded(() => {
+                console.log('[qmlruntime] onLoaded (QML scene ready)');
                 this._emit('qmlloaded');
             });
 
@@ -45,7 +81,7 @@ class QmlRuntime extends EventTarget {
             // TODO: repaint during resize not working - investigate RAF callbacks
             this._resizeObserver = new ResizeObserver((entries) => {
                 for (const entry of entries) {
-                    this.instance.qtResizeAllScreens();
+                    this.instance.qtResizeAllScreens(entry);
                 }
             });
             this._resizeObserver.observe(this.container);
@@ -61,12 +97,38 @@ class QmlRuntime extends EventTarget {
         }
     }
 
+    // Destroy the runtime and clean up
+    destroy() {
+        if (this._resizeObserver) {
+            this._resizeObserver.disconnect();
+            this._resizeObserver = null;
+        }
+
+        if (this.instance) {
+            try {
+                this.instance.clearContent();
+            } catch (e) {
+                // ignore cleanup errors
+            }
+            this.instance = null;
+        }
+
+        this.ready = false;
+
+        // Clear container DOM (canvases, etc.)
+        while (this.container.firstChild) {
+            this.container.removeChild(this.container.firstChild);
+        }
+    }
+
     // Load QML source code
     loadQml(source) {
         if (!this.ready) {
             throw new Error('Runtime not ready');
         }
+        console.log('[qmlruntime] loadQml called');
         this.instance.loadQml(source);
+        console.log('[qmlruntime] loadQml returned');
     }
 
     // Get errors and warnings from last load

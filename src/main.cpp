@@ -10,15 +10,6 @@
 static QmlRuntime* g_runtime = nullptr;
 
 // Custom message handler to suppress Qt warnings from JS console
-void messageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
-{
-    // Only output critical and fatal messages to console
-    if (type == QtCriticalMsg || type == QtFatalMsg) {
-        fprintf(stderr, "%s\n", msg.toUtf8().constData());
-    }
-    // Debug, info, and warning messages are suppressed
-    // (warnings are handled through QmlRuntime::handleWarnings instead)
-}
 
 #ifdef Q_OS_WASM
 static emscripten::val g_onError = emscripten::val::null();
@@ -102,8 +93,6 @@ EMSCRIPTEN_BINDINGS(qmlplayground) {
 
 int main(int argc, char *argv[])
 {
-    qInstallMessageHandler(messageHandler);
-
     QGuiApplication app(argc, argv);
 
     QmlRuntime runtime;

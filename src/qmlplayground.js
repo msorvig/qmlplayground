@@ -108,10 +108,15 @@ function registerQmlMode() {
 }
 
 class QmlPlayground extends EventTarget {
+    static getBuildMode() {
+        return localStorage.getItem('qmlplayground-build-mode') || 'static';
+    }
+
     constructor(container) {
         super();
         this.container = container || document.body;
         this.shadow = this.container.attachShadow({ mode: 'open' });
+        this.buildMode = QmlPlayground.getBuildMode();
 
         // Options
         this.examplesUrl = 'examples/index.json';
@@ -464,6 +469,146 @@ class QmlPlayground extends EventTarget {
                 background: rgba(204, 167, 0, 0.15) !important;
             }
 
+            .btn-settings {
+                background: none !important;
+                font-size: 18px;
+                padding: 4px 8px !important;
+                color: var(--text-secondary);
+            }
+
+            .btn-settings:hover {
+                color: var(--text-primary) !important;
+                background: none !important;
+            }
+
+            .settings-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 200;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .settings-overlay.hidden {
+                display: none;
+            }
+
+            .settings-dialog {
+                background: var(--bg-secondary);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                width: 360px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            }
+
+            .settings-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 16px;
+                border-bottom: 1px solid var(--border);
+                font-size: 14px;
+                font-weight: 500;
+            }
+
+            .settings-header button {
+                background: none;
+                border: none;
+                color: var(--text-secondary);
+                font-size: 18px;
+                cursor: pointer;
+                padding: 0 4px;
+            }
+
+            .settings-header button:hover {
+                color: var(--text-primary);
+            }
+
+            .settings-body {
+                padding: 16px;
+            }
+
+            .settings-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 8px;
+            }
+
+            .settings-label {
+                font-size: 13px;
+            }
+
+            .settings-build-mode {
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-radius: 4px;
+                padding: 6px 8px;
+                font-size: 13px;
+            }
+
+            .settings-hint {
+                font-size: 12px;
+                color: var(--text-secondary);
+                line-height: 1.5;
+            }
+
+            .settings-divider {
+                height: 1px;
+                background: var(--border);
+                margin: 12px 0;
+            }
+
+            .settings-checkboxes {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                margin: 8px 0;
+            }
+
+            .settings-checkboxes label {
+                font-size: 12px;
+                color: var(--text-primary);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .settings-logging-rules {
+                width: 100%;
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-radius: 4px;
+                padding: 6px 8px;
+                font-family: 'Fira Code', monospace;
+                font-size: 12px;
+                resize: vertical;
+                margin: 8px 0;
+            }
+
+            .btn-apply-logging {
+                padding: 6px 12px;
+                background: var(--accent);
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 13px;
+                width: 100%;
+            }
+
+            .btn-apply-logging:hover {
+                background: var(--accent-hover);
+            }
+
             /* CodeMirror overrides */
             .CodeMirror {
                 height: 100% !important;
@@ -487,6 +632,40 @@ class QmlPlayground extends EventTarget {
                 <div class="toolbar-right">
                     <button class="btn-examples">Examples</button>
                     <div class="examples-dropdown hidden"></div>
+                    <button class="btn-settings" title="Settings">&#9881;</button>
+                </div>
+            </div>
+
+            <div class="settings-overlay hidden">
+                <div class="settings-dialog">
+                    <div class="settings-header">
+                        <span>Settings</span>
+                        <button class="btn-settings-close">&times;</button>
+                    </div>
+                    <div class="settings-body">
+                        <div class="settings-row">
+                            <label class="settings-label">Build Mode</label>
+                            <select class="settings-build-mode">
+                                <option value="static">Static (monolithic)</option>
+                                <option value="shared">Shared (dynamic linking)</option>
+                            </select>
+                        </div>
+                        <div class="settings-hint">
+                            Static: all Qt modules linked into one binary.<br>
+                            Shared: Qt modules loaded on demand (smaller initial download).
+                        </div>
+                        <div class="settings-divider"></div>
+                        <div class="settings-label">Logging Categories</div>
+                        <div class="settings-checkboxes">
+                            <label><input type="checkbox" data-rule="qt.qml.import.debug=true"> qt.qml.import</label>
+                            <label><input type="checkbox" data-rule="qt.qml.pluginloadblob.debug=true"> qt.qml.pluginloadblob</label>
+                            <label><input type="checkbox" data-rule="qt.qml.typeresolution.debug=true"> qt.qml.typeresolution</label>
+                            <label><input type="checkbox" data-rule="qt.qpa.debug=true"> qt.qpa</label>
+                        </div>
+                        <textarea class="settings-logging-rules" rows="3"
+                            placeholder="e.g. qt.qml.import.debug=true"></textarea>
+                        <button class="btn-apply-logging">Apply (reloads runtime)</button>
+                    </div>
                 </div>
             </div>
 
@@ -529,6 +708,13 @@ class QmlPlayground extends EventTarget {
         this.consolePaneElement = this.shadow.querySelector('.console-pane');
         this.consoleToggleElement = this.shadow.querySelector('.btn-toggle-console');
         this.consoleHeaderElement = this.shadow.querySelector('.console-header');
+        this.settingsButtonElement = this.shadow.querySelector('.btn-settings');
+        this.settingsOverlayElement = this.shadow.querySelector('.settings-overlay');
+        this.settingsCloseElement = this.shadow.querySelector('.btn-settings-close');
+        this.buildModeSelectElement = this.shadow.querySelector('.settings-build-mode');
+        this.loggingRulesElement = this.shadow.querySelector('.settings-logging-rules');
+        this.loggingCheckboxes = this.shadow.querySelectorAll('.settings-checkboxes input[type="checkbox"]');
+        this.applyLoggingElement = this.shadow.querySelector('.btn-apply-logging');
     }
 
     // Initialize the playground
@@ -607,6 +793,50 @@ class QmlPlayground extends EventTarget {
             });
         }
 
+        // Settings button and dialog
+        if (this.settingsButtonElement && this.settingsOverlayElement) {
+            this.settingsButtonElement.addEventListener('click', () => {
+                this.settingsOverlayElement.classList.remove('hidden');
+            });
+            this.settingsCloseElement.addEventListener('click', () => {
+                this.settingsOverlayElement.classList.add('hidden');
+            });
+            this.settingsOverlayElement.addEventListener('click', (e) => {
+                if (e.target === this.settingsOverlayElement) {
+                    this.settingsOverlayElement.classList.add('hidden');
+                }
+            });
+
+            // Build mode selector
+            this.buildModeSelectElement.value = this.buildMode;
+            this.buildModeSelectElement.addEventListener('change', (e) => {
+                const mode = e.target.value;
+                localStorage.setItem('qmlplayground-build-mode', mode);
+                this.settingsOverlayElement.classList.add('hidden');
+                this._loadRuntime(mode);
+            });
+
+            // Logging rules
+            const savedRules = localStorage.getItem('qmlplayground-logging-rules') || '';
+            this.loggingRulesElement.value = savedRules;
+            this._syncLoggingCheckboxes(savedRules);
+
+            // Checkboxes toggle rules in the textarea
+            this.loggingCheckboxes.forEach(cb => {
+                cb.addEventListener('change', () => {
+                    this._syncLoggingTextFromCheckboxes();
+                });
+            });
+
+            // Apply button
+            this.applyLoggingElement.addEventListener('click', () => {
+                const rules = this.loggingRulesElement.value.trim();
+                localStorage.setItem('qmlplayground-logging-rules', rules);
+                this.settingsOverlayElement.classList.add('hidden');
+                this._loadRuntime(this.buildMode);
+            });
+        }
+
         // Console toggle
         if (this.consoleHeaderElement && this.consolePaneElement) {
             this.consoleHeaderElement.addEventListener('click', () => {
@@ -653,20 +883,61 @@ class QmlPlayground extends EventTarget {
         });
     }
 
+    // Sync checkbox state from a rules string
+    _syncLoggingCheckboxes(rules) {
+        this.loggingCheckboxes.forEach(cb => {
+            cb.checked = rules.includes(cb.dataset.rule);
+        });
+    }
+
+    // Build rules string from checkboxes + any extra lines in textarea
+    _syncLoggingTextFromCheckboxes() {
+        // Collect checked rules
+        const checkedRules = [];
+        this.loggingCheckboxes.forEach(cb => {
+            if (cb.checked) checkedRules.push(cb.dataset.rule);
+        });
+
+        // Keep any manual lines that aren't covered by checkboxes
+        const allCheckboxRules = new Set();
+        this.loggingCheckboxes.forEach(cb => allCheckboxRules.add(cb.dataset.rule));
+
+        const manualLines = this.loggingRulesElement.value
+            .split('\n')
+            .filter(line => line.trim() && !allCheckboxRules.has(line.trim()));
+
+        this.loggingRulesElement.value = [...checkedRules, ...manualLines].join('\n');
+    }
+
     // Initialize QmlRuntime
     async _initRuntime() {
+        await this._loadRuntime(this.buildMode);
+    }
+
+    // Load (or reload) the Qt runtime for the given build mode
+    async _loadRuntime(mode) {
         if (!this.containerElement) return;
 
-        this._setStatus('loading');
-        this.log('Loading Qt runtime...');
+        // Tear down existing runtime
+        if (this.runtime) {
+            this.runtime.destroy();
+            this.runtime = null;
+        }
 
-        this.runtime = new QmlRuntime(this.containerElement);
+        this.buildMode = mode;
+
+        this._showLoading();
+        this._setStatus('loading');
+        this.log(`Loading Qt runtime (${mode})...`);
+
+        const loggingRules = localStorage.getItem('qmlplayground-logging-rules') || '';
+        this.runtime = new QmlRuntime(this.containerElement, { mode, loggingRules });
 
         this.runtime.on('loading', () => this._emit('loading'));
         this.runtime.on('ready', (detail) => {
             this._hideLoading();
             this._setStatus('ready');
-            this.log(`Qt ${detail.qtVersion} ready (${detail.loadTime.toFixed(0)}ms)`, 'success');
+            this.log(`Qt ${detail.qtVersion} ready [${mode}] (${detail.loadTime.toFixed(0)}ms)`, 'success');
             this._emit('ready', detail);
             // Run initial code if editor has content
             if (this.editor && this.editor.getValue().trim()) {
@@ -681,7 +952,11 @@ class QmlPlayground extends EventTarget {
             this._showIssue({ ...detail, type: 'warning' });
             this._emit('warning', detail);
         });
-        this.runtime.on('qmlloaded', () => this._emit('qmlloaded'));
+        this.runtime.on('qmlloaded', () => {
+            console.log('[playground] qmlloaded callback');
+            this._checkErrors();
+            this._emit('qmlloaded');
+        });
 
         await this.runtime.load();
     }
@@ -701,6 +976,12 @@ class QmlPlayground extends EventTarget {
         const s = statusMap[status] || statusMap.ready;
         this.statusElement.textContent = s.text;
         this.statusElement.className = s.className;
+    }
+
+    // Show loading overlay
+    _showLoading() {
+        this.loadingElement?.classList.remove('hidden');
+        this.containerElement?.classList.remove('qt-ready');
     }
 
     // Hide loading overlay
@@ -756,10 +1037,14 @@ class QmlPlayground extends EventTarget {
         this._setStatus('running');
         this._emit('running');
 
+        console.log('[playground] run: loading QML');
+
         try {
             this.runtime.loadQml(source);
-            setTimeout(() => this._checkErrors(), 100);
+            // Don't check errors here — wait for the qmlloaded callback
+            // which fires after async plugin loading completes
         } catch (e) {
+            console.log('[playground] run: exception:', e.message);
             this._showIssue({ line: 0, column: 0, message: e.message, type: 'error' });
             this._emit('error', { line: 0, column: 0, message: e.message });
         }

@@ -16,6 +16,13 @@ QmlRuntime::QmlRuntime(QObject *parent)
     // Set up engine
     m_engine->setBaseUrl(QUrl("qrc:/"));
 
+    // Add QML import path for shared/dynamic builds — the engine resolves
+    // plugin paths relative to this, which maps to HTTP-fetchable URLs.
+    // QML_IMPORT_PATH is set by the JS runtime to match the deploy layout.
+    const QByteArray qmlImportPath = qgetenv("QML_IMPORT_PATH");
+    if (!qmlImportPath.isEmpty())
+        m_engine->addImportPath(QString::fromUtf8(qmlImportPath));
+
     // Capture runtime warnings
     connect(m_engine.get(), &QQmlEngine::warnings, this, &QmlRuntime::handleWarnings);
 }
