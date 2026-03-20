@@ -2,6 +2,8 @@
 
 A browser-based QML editor and runtime powered by Qt for WebAssembly.
 
+**Try it:** [msorvig.github.io/qmlplayground](https://msorvig.github.io/qmlplayground/)
+
 ## Features
 
 - Live QML editing with syntax highlighting
