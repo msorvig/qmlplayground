@@ -646,12 +646,14 @@ class QmlPlayground extends EventTarget {
                         <div class="settings-row">
                             <label class="settings-label">Build Mode</label>
                             <select class="settings-build-mode">
-                                <option value="static">Static (monolithic)</option>
+                                <option value="static">Static</option>
+                                <option value="exceptions">Static + wasm exceptions</option>
                                 <option value="shared">Shared (dynamic linking)</option>
                             </select>
                         </div>
                         <div class="settings-hint">
                             Static: all Qt modules linked into one binary.<br>
+                            Exceptions: static with wasm exception handling.<br>
                             Shared: Qt modules loaded on demand (smaller initial download).
                         </div>
                         <div class="settings-divider"></div>

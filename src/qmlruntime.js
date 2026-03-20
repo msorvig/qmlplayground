@@ -1,8 +1,9 @@
 // QmlRuntime - JavaScript wrapper for Qt QML WebAssembly runtime
 
 const buildModes = {
-    static: { basePath: 'static', shared: false },
-    shared: { basePath: 'shared', shared: true },
+    'static':     { basePath: 'static', shared: false },
+    'exceptions': { basePath: 'exceptions', shared: false },
+    'shared':     { basePath: 'shared', shared: true },
 };
 
 class QmlRuntime extends EventTarget {

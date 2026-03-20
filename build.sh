@@ -3,89 +3,91 @@ set -e
 
 # Build script for QML Playground.
 #
-# Expects the following environment variables:
-#   QT_STATIC_PREFIX  - path to static Qt install (e.g. /path/to/qt/wasm/qtbase)
-#   QT_SHARED_PREFIX  - path to shared Qt install (e.g. /path/to/qt/wasm-shared/qtbase)
+# Expects the following environment variables (set any combination):
+#   QT_STATIC_PREFIX      - path to static Qt install
+#   QT_EXCEPTIONS_PREFIX  - path to static Qt install with wasm exceptions
+#   QT_SHARED_PREFIX      - path to shared Qt install
 #
-# Either or both can be set. Omit one to skip that variant.
+# Omit a variable to skip that variant.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DEPLOY_DIR="$SCRIPT_DIR/deploy"
 BUILD_STATIC="$SCRIPT_DIR/build-wasm"
+BUILD_EXCEPTIONS="$SCRIPT_DIR/build-wasm-exceptions"
 BUILD_SHARED="$SCRIPT_DIR/build-wasm-shared"
 
 usage() {
-    echo "Usage: $0 [static|shared|all|deploy] [--clean] [--opt] [--copy-qt]"
-    echo "  static    - Build static (monolithic) variant"
-    echo "  shared    - Build shared (dynamic linking) variant"
-    echo "  all       - Build both variants (default)"
-    echo "  deploy    - Build and deploy both variants"
-    echo "  --clean   - Remove build directories before building"
-    echo "  --opt     - Run wasm-opt on deployed wasm (slow)"
-    echo "  --copy-qt - Copy Qt libs into deploy instead of symlinking"
+    echo "Usage: $0 [static|exceptions|shared|all|deploy] [--clean] [--opt] [--copy-qt]"
+    echo "  static      - Build static (monolithic) variant"
+    echo "  exceptions  - Build static with wasm exceptions"
+    echo "  shared      - Build shared (dynamic linking) variant"
+    echo "  all         - Build all variants (default)"
+    echo "  deploy      - Build and deploy all variants"
+    echo "  --clean     - Remove build directories before building"
+    echo "  --opt       - Run wasm-opt on deployed wasm (slow)"
+    echo "  --copy-qt   - Copy Qt libs into deploy instead of symlinking"
     echo ""
     echo "Environment variables:"
-    echo "  QT_STATIC_PREFIX  - path to static Qt install"
-    echo "  QT_SHARED_PREFIX  - path to shared Qt install"
+    echo "  QT_STATIC_PREFIX      - path to static Qt install"
+    echo "  QT_EXCEPTIONS_PREFIX  - path to static Qt install with wasm exceptions"
+    echo "  QT_SHARED_PREFIX      - path to shared Qt install"
     exit 1
 }
 
-require_static() {
-    if [ -z "$QT_STATIC_PREFIX" ]; then
-        echo "Error: QT_STATIC_PREFIX not set" >&2
-        exit 1
+# Configure and build a static variant
+# Usage: build_static_variant <qt_prefix> <build_dir> <deploy_subdir> <label>
+build_static_variant() {
+    local qt_prefix="$1" build_dir="$2" deploy_subdir="$3" label="$4"
+    if [ -z "$qt_prefix" ]; then
+        echo "Skipping $label (prefix not set)"
+        return
+    fi
+    if [ ! -f "$build_dir/build.ninja" ]; then
+        echo "=== Configuring $label ==="
+        "$qt_prefix/bin/qt-cmake" -S "$SCRIPT_DIR" -B "$build_dir" \
+            -DQMLPLAYGROUND_DEPLOY_SUBDIR="$deploy_subdir" \
+            -GNinja
+    fi
+    echo "=== Building $label ==="
+    cmake --build "$build_dir"
+}
+
+deploy_static_variant() {
+    local qt_prefix="$1" build_dir="$2" deploy_subdir="$3" label="$4"
+    if [ -z "$qt_prefix" ]; then return; fi
+    build_static_variant "$qt_prefix" "$build_dir" "$deploy_subdir" "$label"
+    echo "=== Deploying $label ==="
+    cmake --build "$build_dir" --target deploy
+    if $OPT; then
+        echo "=== Optimizing $label wasm ==="
+        cmake --build "$build_dir" --target deploy-opt
     fi
 }
 
-require_shared() {
+build_static()     { build_static_variant "$QT_STATIC_PREFIX" "$BUILD_STATIC" "static" "static"; }
+build_exceptions() { build_static_variant "$QT_EXCEPTIONS_PREFIX" "$BUILD_EXCEPTIONS" "exceptions" "exceptions"; }
+
+deploy_static()     { deploy_static_variant "$QT_STATIC_PREFIX" "$BUILD_STATIC" "static" "static"; }
+deploy_exceptions() { deploy_static_variant "$QT_EXCEPTIONS_PREFIX" "$BUILD_EXCEPTIONS" "exceptions" "exceptions"; }
+
+build_shared() {
     if [ -z "$QT_SHARED_PREFIX" ]; then
-        echo "Error: QT_SHARED_PREFIX not set" >&2
-        exit 1
+        echo "Skipping shared (QT_SHARED_PREFIX not set)"
+        return
     fi
-}
-
-configure_static() {
-    require_static
-    if [ ! -f "$BUILD_STATIC/build.ninja" ]; then
-        echo "=== Configuring static build ==="
-        "$QT_STATIC_PREFIX/bin/qt-cmake" -S "$SCRIPT_DIR" -B "$BUILD_STATIC" -GNinja
-    fi
-}
-
-configure_shared() {
-    require_shared
     if [ ! -f "$BUILD_SHARED/build.ninja" ]; then
-        echo "=== Configuring shared build ==="
+        echo "=== Configuring shared ==="
         "$QT_SHARED_PREFIX/bin/qt-cmake" -S "$SCRIPT_DIR" -B "$BUILD_SHARED" \
             -DQMLPLAYGROUND_SHARED=ON \
             -DQMLPLAYGROUND_QT_PREFIX="$QT_SHARED_PREFIX" \
             -GNinja
     fi
-}
-
-build_static() {
-    configure_static
-    echo "=== Building static ==="
-    cmake --build "$BUILD_STATIC"
-}
-
-build_shared() {
-    configure_shared
     echo "=== Building shared ==="
     cmake --build "$BUILD_SHARED"
 }
 
-deploy_static() {
-    build_static
-    echo "=== Deploying static ==="
-    cmake --build "$BUILD_STATIC" --target deploy
-    if $OPT; then
-        echo "=== Optimizing static wasm ==="
-        cmake --build "$BUILD_STATIC" --target deploy-opt
-    fi
-}
-
 deploy_shared() {
+    if [ -z "$QT_SHARED_PREFIX" ]; then return; fi
     build_shared
     echo "=== Deploying shared ==="
     cmake --build "$BUILD_SHARED" --target deploy
@@ -98,9 +100,7 @@ deploy_shared() {
     fi
 }
 
-# Replace symlinks in deploy/shared/qt/ with actual copies
 copy_qt() {
-    require_shared
     local qt_dir="$DEPLOY_DIR/shared/qt"
     echo "=== Copying Qt libs (replacing symlinks) ==="
     for dir in lib plugins qml; do
@@ -116,7 +116,7 @@ copy_qt() {
 
 clean() {
     echo "=== Cleaning build directories ==="
-    rm -rf "$BUILD_STATIC" "$BUILD_SHARED"
+    rm -rf "$BUILD_STATIC" "$BUILD_EXCEPTIONS" "$BUILD_SHARED"
 }
 
 # Parse args
@@ -137,10 +137,11 @@ if $CLEAN; then
 fi
 
 case "$TARGET" in
-    static)  build_static ;;
-    shared)  build_shared ;;
-    all)     build_static; build_shared ;;
-    deploy)  deploy_static; deploy_shared ;;
-    --clean|--opt|--copy-qt) ;; # flag-only, already handled
-    *)       usage ;;
+    static)     build_static ;;
+    exceptions) build_exceptions ;;
+    shared)     build_shared ;;
+    all)        build_static; build_exceptions; build_shared ;;
+    deploy)     deploy_static; deploy_exceptions; deploy_shared ;;
+    --clean|--opt|--copy-qt) ;;
+    *)          usage ;;
 esac
