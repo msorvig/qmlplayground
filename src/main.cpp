@@ -7,9 +7,8 @@
 #include <emscripten/val.h>
 #endif
 
+static QGuiApplication *g_app = nullptr;
 static QmlRuntime* g_runtime = nullptr;
-
-// Custom message handler to suppress Qt warnings from JS console
 
 #ifdef Q_OS_WASM
 static emscripten::val g_onError = emscripten::val::null();
@@ -91,32 +90,40 @@ EMSCRIPTEN_BINDINGS(qmlplayground) {
 }
 #endif
 
+
 int main(int argc, char *argv[])
 {
-    QGuiApplication app(argc, argv);
+    // Copy argv to the heap — on wasm, main's stack frame is
+    // invalidated when main() returns to the event loop, but
+    // QCoreApplication keeps a reference to argv.
+    char **heapArgv = new char*[argc + 1];
+    for (int i = 0; i < argc; ++i)
+        heapArgv[i] = strdup(argv[i]);
+    heapArgv[argc] = nullptr;
 
-    QmlRuntime runtime;
-    g_runtime = &runtime;
+    g_app = new QGuiApplication(argc, heapArgv);
+
+    g_runtime = new QmlRuntime();
 
 #ifdef Q_OS_WASM
     // Connect signals to JavaScript callbacks
-    QObject::connect(&runtime, &QmlRuntime::errorOccurred,
+    QObject::connect(g_runtime, &QmlRuntime::errorOccurred,
         [](int line, int column, const QString &message) {
             notifyError(line, column, message.toStdString());
         });
 
-    QObject::connect(&runtime, &QmlRuntime::warningOccurred,
+    QObject::connect(g_runtime, &QmlRuntime::warningOccurred,
         [](int line, int column, const QString &message) {
             notifyWarning(line, column, message.toStdString());
         });
 
-    QObject::connect(&runtime, &QmlRuntime::loaded, []() {
+    QObject::connect(g_runtime, &QmlRuntime::loaded, []() {
         notifyLoaded();
     });
 #endif
 
     // Load default QML
-    runtime.loadQml(R"(
+    g_runtime->loadQml(R"(
         import QtQuick
 
         Rectangle {
@@ -132,5 +139,5 @@ int main(int argc, char *argv[])
         }
     )");
 
-    return app.exec();
+    return 0; // No exec(); return to browser event loop
 }
