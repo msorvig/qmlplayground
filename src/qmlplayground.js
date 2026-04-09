@@ -190,6 +190,7 @@ class QmlPlayground extends EventTarget {
                 display: flex;
                 align-items: center;
                 gap: 12px;
+                position: relative;
             }
 
             .toolbar-title {
@@ -245,7 +246,7 @@ class QmlPlayground extends EventTarget {
             .examples-dropdown {
                 position: absolute;
                 top: 40px;
-                right: 12px;
+                left: 0;
                 background: var(--bg-secondary);
                 border: 1px solid var(--border);
                 border-radius: 4px;
@@ -622,6 +623,8 @@ class QmlPlayground extends EventTarget {
         this.shadow.innerHTML += `
             <div class="toolbar">
                 <div class="toolbar-left">
+                    <button class="btn-examples">Examples</button>
+                    <div class="examples-dropdown hidden"></div>
                     <button class="btn-run" title="Run (Ctrl+Enter)">Run</button>
                     <label class="auto-run-label">
                         <input type="checkbox" class="auto-run-checkbox" checked>
@@ -630,8 +633,6 @@ class QmlPlayground extends EventTarget {
                 </div>
                 <div class="toolbar-title">QML Playground</div>
                 <div class="toolbar-right">
-                    <button class="btn-examples">Examples</button>
-                    <div class="examples-dropdown hidden"></div>
                     <button class="btn-settings" title="Settings">&#9881;</button>
                 </div>
             </div>
@@ -646,14 +647,12 @@ class QmlPlayground extends EventTarget {
                         <div class="settings-row">
                             <label class="settings-label">Build Mode</label>
                             <select class="settings-build-mode">
-                                <option value="static">Static</option>
-                                <option value="exceptions">Static + wasm exceptions</option>
+                                <option value="static">Static (monolithic)</option>
                                 <option value="shared">Shared (dynamic linking)</option>
                             </select>
                         </div>
                         <div class="settings-hint">
                             Static: all Qt modules linked into one binary.<br>
-                            Exceptions: static with wasm exception handling.<br>
                             Shared: Qt modules loaded on demand (smaller initial download).
                         </div>
                         <div class="settings-divider"></div>
@@ -756,10 +755,17 @@ class QmlPlayground extends EventTarget {
         this.editor.on('change', () => {
             if (!this.autoRun || !this.runtime?.ready || this._suppressAutoRun) return;
 
+            if (this._runInFlight) {
+                // A run is in progress — schedule a re-run when it completes
+                this._runPending = true;
+                return;
+            }
+
+            // Debounce rapid keystrokes (e.g. paste, hold key)
             if (this._autoRunTimeout) {
                 clearTimeout(this._autoRunTimeout);
             }
-            this._autoRunTimeout = setTimeout(() => this.run(), this.autoRunDelay);
+            this._autoRunTimeout = setTimeout(() => this.run(), 50);
         });
 
         this._emit('editorready');
@@ -958,6 +964,7 @@ class QmlPlayground extends EventTarget {
             console.log('[playground] qmlloaded callback');
             this._checkErrors();
             this._emit('qmlloaded');
+            this._runComplete();
         });
 
         await this.runtime.load();
@@ -1040,19 +1047,29 @@ class QmlPlayground extends EventTarget {
         this._emit('running');
 
         console.log('[playground] run: loading QML');
+        this._runInFlight = true;
 
         try {
             this.runtime.loadQml(source);
             // Don't check errors here — wait for the qmlloaded callback
             // which fires after async plugin loading completes
         } catch (e) {
-            console.log('[playground] run: exception:', e.message);
+            console.log('[playground] run: exception:', e.message, e.stack);
             this._showIssue({ line: 0, column: 0, message: e.message, type: 'error' });
             this._emit('error', { line: 0, column: 0, message: e.message });
+            this._runComplete();
         }
     }
 
     // Check and display errors from runtime
+    _runComplete() {
+        this._runInFlight = false;
+        if (this._runPending) {
+            this._runPending = false;
+            this.run();
+        }
+    }
+
     _checkErrors() {
         const issues = this.runtime.getErrors();
         const errors = issues.filter(i => i.type === 'error' || !i.type);

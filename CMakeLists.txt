@@ -45,12 +45,10 @@ set_target_properties(qmlruntime_wasm PROPERTIES QT_WASM_EXTRA_EXPORTED_METHODS 
 # WebAssembly-specific settings
 if(EMSCRIPTEN)
     if(QMLPLAYGROUND_SHARED)
-        set(_default_subdir "shared")
+        set(DEPLOY_DIR ${CMAKE_SOURCE_DIR}/dist/shared)
     else()
-        set(_default_subdir "static")
+        set(DEPLOY_DIR ${CMAKE_SOURCE_DIR}/dist/static)
     endif()
-    set(QMLPLAYGROUND_DEPLOY_SUBDIR "${_default_subdir}" CACHE STRING "Deploy subdirectory name")
-    set(DEPLOY_DIR ${CMAKE_SOURCE_DIR}/deploy/${QMLPLAYGROUND_DEPLOY_SUBDIR})
 
     # Deploy target
     add_custom_target(deploy
@@ -107,7 +105,7 @@ if(EMSCRIPTEN)
         )
     endif()
 
-    set(FRONTEND_DIR ${CMAKE_SOURCE_DIR}/deploy)
+    set(FRONTEND_DIR ${CMAKE_SOURCE_DIR}/dist)
 
     if(NOT QMLPLAYGROUND_SHARED)
         # Static build deploys the web frontend to deploy/ (root)

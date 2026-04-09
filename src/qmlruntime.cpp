@@ -60,6 +60,7 @@ void QmlRuntime::handleComponentStatus()
             m_rootItem->setOpacity(0.3);
         }
         emit errorsChanged(getErrors());
+        emit loaded();
         return;
     }
 

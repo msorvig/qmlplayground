@@ -25,5 +25,5 @@ cmake-build-*/
 .DS_Store
 Thumbs.db
 
-# Deploy directory (committed on gh_pages, not main)
-deploy/
+# Dist directory (committed on gh_pages, not main)
+dist/

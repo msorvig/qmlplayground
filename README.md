@@ -104,8 +104,34 @@ const runtime = new QmlRuntime(document.getElementById('container'), {
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `mode` | `'static'` | `'static'` for monolithic build, `'shared'` for dynamic linking |
+| `mode` | `'static'` | `'static'` or `'shared'` |
 | `loggingRules` | `''` | Qt logging filter rules (semicolon-separated), passed via `QT_LOGGING_RULES` |
+
+#### Loading QML
+
+`loadQml()` starts loading asynchronously. Listen for `qmlloaded` to know when
+loading completes (both on success and on error). Use `getErrors()` to check
+the result.
+
+```javascript
+runtime.on('qmlloaded', () => {
+    const issues = runtime.getErrors();
+    const errors = issues.filter(i => i.type === 'error');
+    if (errors.length > 0)
+        console.error('Errors:', errors);
+    else
+        console.log('QML loaded successfully');
+});
+
+runtime.loadQml(`
+    import QtQuick
+    Rectangle { anchors.fill: parent; color: "steelblue" }
+`);
+```
+
+With the `shared` build mode, `loadQml()` may trigger on-demand fetching of
+QML plugin `.so` files over HTTP. The `qmlloaded` event fires after all
+plugins have loaded and types are resolved.
 
 #### Methods
 
@@ -113,9 +139,19 @@ const runtime = new QmlRuntime(document.getElementById('container'), {
 |--------|-------------|
 | `load()` | Load the Qt runtime (async) |
 | `destroy()` | Tear down the runtime and clean up |
-| `loadQml(source)` | Load and run QML source code |
+| `loadQml(source)` | Load QML source; listen for `qmlloaded` when done |
 | `getErrors()` | Get errors/warnings from last load |
 | `clear()` | Clear the QML scene |
+
+#### Events
+
+| Event | Detail | Description |
+|-------|--------|-------------|
+| `loading` | - | Runtime starting to load |
+| `ready` | `{ loadTime, qtVersion }` | Runtime ready, `loadQml` can be called |
+| `qmlloaded` | - | QML loading complete (success or error); check `getErrors()` |
+| `error` | `{ line, column, message }` | Individual QML error |
+| `warning` | `{ line, column, message }` | Individual QML warning |
 
 ## Build Modes
 
@@ -123,10 +159,9 @@ The playground supports two build modes:
 
 | | Static | Shared |
 |---|---|---|
-| Linking | All Qt modules in one wasm binary | Core + QML engine only; modules loaded on demand |
+| Linking | All Qt modules in one wasm binary | Core + QML engine; modules loaded on demand |
 | Size | Large (~38 MB) | Small initial download; modules fetched as needed |
-| Qt build | `qt/wasm/` (static libs) | `qt/wasm-shared/` (shared libs) |
-| Deploy dir | `deploy/static/` | `deploy/shared/` |
+| Deploy dir | `dist/static/` | `dist/shared/` |
 
 Users can switch between modes at runtime via the Settings dialog (gear icon).
 The selection persists in localStorage.
@@ -177,7 +212,7 @@ cmake --build build-wasm-shared --target deploy
 ### Deploy layout
 
 ```
-deploy/
+dist/
   index.html              Web frontend (served from root)
   qmlplayground.js
   qmlruntime.js
@@ -220,7 +255,7 @@ src/
 examples/
   index.json            Examples index
   *.qml                 Example files
-deploy/                 Generated output (gitignored)
+dist/                 Generated output (gitignored)
   static/               Static build wasm files
   shared/               Shared build wasm files + Qt symlinks
 ```

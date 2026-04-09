@@ -96,12 +96,13 @@ int main(int argc, char *argv[])
     // Copy argv to the heap — on wasm, main's stack frame is
     // invalidated when main() returns to the event loop, but
     // QCoreApplication keeps a reference to argv.
-    char **heapArgv = new char*[argc + 1];
+    static int heapArgc = argc;
+    static char **heapArgv = new char*[argc + 1];
     for (int i = 0; i < argc; ++i)
         heapArgv[i] = strdup(argv[i]);
     heapArgv[argc] = nullptr;
 
-    g_app = new QGuiApplication(argc, heapArgv);
+    g_app = new QGuiApplication(heapArgc, heapArgv);
 
     g_runtime = new QmlRuntime();
 
