@@ -648,7 +648,7 @@ class QmlPlayground extends EventTarget {
             .CodeMirror {
                 height: 100% !important;
                 font-size: 14px;
-                font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+                font-family: 'Titillium Web', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             }
         `;
         this.shadow.appendChild(style);
