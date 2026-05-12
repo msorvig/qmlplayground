@@ -34,6 +34,7 @@ private:
     std::unique_ptr<QQuickWindow> m_window;
     std::unique_ptr<QQmlComponent> m_component;
     QQuickItem *m_rootItem = nullptr;
+    QQuickWindow *m_rootWindow = nullptr;
     QStringList m_errors;
     QStringList m_warnings;
 };

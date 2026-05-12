@@ -64,7 +64,10 @@ void QmlRuntime::handleComponentStatus()
         return;
     }
 
-    // Create the root object
+    // Create the root object. The root may be either a QQuickItem (parented
+    // into the placeholder canvas window) or a QQuickWindow / ApplicationWindow
+    // (shown as a top-level window — the QtWasm platform maps it to the
+    // canvas).
     QObject *obj = m_component->create();
     if (!obj) {
         m_errors.append("Failed to create root object");
@@ -73,38 +76,61 @@ void QmlRuntime::handleComponentStatus()
     }
 
     QQuickItem *newRootItem = qobject_cast<QQuickItem*>(obj);
-    if (!newRootItem) {
-        m_errors.append("Root object is not a QQuickItem");
+    QQuickWindow *newRootWindow = qobject_cast<QQuickWindow*>(obj);
+
+    if (!newRootItem && !newRootWindow) {
+        m_errors.append("Root object is not a QQuickItem or QQuickWindow");
         obj->deleteLater();
         emit errorsChanged(getErrors());
         return;
     }
 
-    // Success - clean up old root item
+    // Tear down previous root (item or window).
     if (m_rootItem) {
         m_rootItem->setParentItem(nullptr);
         m_rootItem->deleteLater();
+        m_rootItem = nullptr;
     }
-    m_rootItem = newRootItem;
+    if (m_rootWindow) {
+        m_rootWindow->setVisible(false);
+        m_rootWindow->deleteLater();
+        m_rootWindow = nullptr;
+    }
 
-    // Parent to window's content item
-    m_rootItem->setParentItem(m_window->contentItem());
-    m_rootItem->setOpacity(1.0);
+    if (newRootWindow) {
+        // Window-rooted QML (Window / ApplicationWindow): show it as a
+        // top-level window. Hide the placeholder canvas so we don't render
+        // an empty surface behind it.
+        m_rootWindow = newRootWindow;
+        m_window->setVisible(false);
+        if (m_rootWindow->width() <= 0 || m_rootWindow->height() <= 0)
+            m_rootWindow->resize(m_window->size());
+        m_rootWindow->setVisible(true);
+    } else {
+        m_rootItem = newRootItem;
 
-    // If root item uses anchors.fill: parent, this enables it
-    m_rootItem->setSize(m_window->contentItem()->size());
+        // Re-show the placeholder canvas in case a prior load was a window.
+        if (!m_window->isVisible())
+            m_window->setVisible(true);
 
-    // Track window resize
-    connect(m_window->contentItem(), &QQuickItem::widthChanged, this, [this]() {
-        if (m_rootItem) {
-            m_rootItem->setWidth(m_window->contentItem()->width());
-        }
-    });
-    connect(m_window->contentItem(), &QQuickItem::heightChanged, this, [this]() {
-        if (m_rootItem) {
-            m_rootItem->setHeight(m_window->contentItem()->height());
-        }
-    });
+        m_rootItem->setParentItem(m_window->contentItem());
+        m_rootItem->setOpacity(1.0);
+
+        // Honor anchors.fill: parent
+        m_rootItem->setSize(m_window->contentItem()->size());
+
+        // Track window resize
+        connect(m_window->contentItem(), &QQuickItem::widthChanged, this, [this]() {
+            if (m_rootItem) {
+                m_rootItem->setWidth(m_window->contentItem()->width());
+            }
+        });
+        connect(m_window->contentItem(), &QQuickItem::heightChanged, this, [this]() {
+            if (m_rootItem) {
+                m_rootItem->setHeight(m_window->contentItem()->height());
+            }
+        });
+    }
 
     emit loaded();
 }
