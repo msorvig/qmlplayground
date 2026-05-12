@@ -624,7 +624,8 @@ class QmlPlayground extends EventTarget {
                 font-size: 13px;
             }
 
-            .settings-build-mode {
+            .settings-build-mode,
+            .settings-theme {
                 background: var(--bg-tertiary);
                 color: var(--text-primary);
                 border: 1px solid var(--border);
