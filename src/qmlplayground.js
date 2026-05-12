@@ -113,7 +113,7 @@ class QmlPlayground extends EventTarget {
     }
 
     static getTheme() {
-        return localStorage.getItem('qmlplayground-theme') || 'system';
+        return localStorage.getItem('qmlplayground-theme') || 'dark';
     }
 
     static _resolveTheme(theme) {
@@ -551,7 +551,7 @@ class QmlPlayground extends EventTarget {
 
             .btn-settings {
                 background: none !important;
-                font-size: 24px;
+                font-size: x-large;
                 padding: 4px 8px !important;
                 color: var(--text-secondary);
             }
