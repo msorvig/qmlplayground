@@ -112,6 +112,18 @@ class QmlPlayground extends EventTarget {
         return localStorage.getItem('qmlplayground-build-mode') || 'static';
     }
 
+    static getTheme() {
+        return localStorage.getItem('qmlplayground-theme') || 'system';
+    }
+
+    static _resolveTheme(theme) {
+        if (theme === 'system') {
+            return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light' : 'dark';
+        }
+        return theme;
+    }
+
     // @font-face inside shadow DOM is not reliably honored across browsers,
     // so the playground installs its bundled fonts into the document head once.
     static _injectFonts() {
@@ -149,6 +161,7 @@ class QmlPlayground extends EventTarget {
         this.container = container || document.body;
         this.shadow = this.container.attachShadow({ mode: 'open' });
         this.buildMode = QmlPlayground.getBuildMode();
+        this.theme = QmlPlayground.getTheme();
 
         // Options
         this.examplesUrl = 'examples/index.json';
@@ -166,8 +179,27 @@ class QmlPlayground extends EventTarget {
         this._buildDOM();
     }
 
+    _applyTheme() {
+        const resolved = QmlPlayground._resolveTheme(this.theme);
+        if (this.container && this.container.setAttribute) {
+            this.container.setAttribute('data-theme', resolved);
+        }
+        if (this.editor) {
+            this.editor.setOption('theme', resolved === 'light' ? 'default' : 'gruvbox-dark');
+        }
+    }
+
     _buildDOM() {
         QmlPlayground._injectFonts();
+
+        // Apply initial theme on the host element and listen for system pref changes.
+        this._applyTheme();
+        if (window.matchMedia) {
+            const mql = window.matchMedia('(prefers-color-scheme: light)');
+            const onChange = () => { if (this.theme === 'system') this._applyTheme(); };
+            if (mql.addEventListener) mql.addEventListener('change', onChange);
+            else if (mql.addListener) mql.addListener(onChange);
+        }
 
         // Inject CodeMirror stylesheets into shadow DOM
         const cmStyle = document.createElement('link');
@@ -201,6 +233,19 @@ class QmlPlayground extends EventTarget {
                 font-family: 'Titillium Web', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 background: var(--bg-primary);
                 color: var(--text-primary);
+            }
+
+            :host([data-theme="light"]) {
+                --bg-primary: #ffffff;
+                --bg-secondary: #f3f3f3;
+                --bg-tertiary: #e8e8e8;
+                --text-primary: #1f1f1f;
+                --text-secondary: #5a5a5a;
+                --accent: #0066b8;
+                --accent-hover: #1a78d6;
+                --border: #d4d4d4;
+                --error: #c62828;
+                --warning: #8a6d00;
             }
 
             * {
@@ -679,6 +724,15 @@ class QmlPlayground extends EventTarget {
                     </div>
                     <div class="settings-body">
                         <div class="settings-row">
+                            <label class="settings-label">Theme</label>
+                            <select class="settings-theme">
+                                <option value="system">System</option>
+                                <option value="dark">Dark</option>
+                                <option value="light">Light</option>
+                            </select>
+                        </div>
+                        <div class="settings-divider"></div>
+                        <div class="settings-row">
                             <label class="settings-label">Build Mode</label>
                             <select class="settings-build-mode">
                                 <option value="static">Static (monolithic)</option>
@@ -746,6 +800,7 @@ class QmlPlayground extends EventTarget {
         this.settingsButtonElement = this.shadow.querySelector('.btn-settings');
         this.settingsOverlayElement = this.shadow.querySelector('.settings-overlay');
         this.settingsCloseElement = this.shadow.querySelector('.btn-settings-close');
+        this.themeSelectElement = this.shadow.querySelector('.settings-theme');
         this.buildModeSelectElement = this.shadow.querySelector('.settings-build-mode');
         this.loggingRulesElement = this.shadow.querySelector('.settings-logging-rules');
         this.loggingCheckboxes = this.shadow.querySelectorAll('.settings-checkboxes input[type="checkbox"]');
@@ -847,6 +902,14 @@ class QmlPlayground extends EventTarget {
                 if (e.target === this.settingsOverlayElement) {
                     this.settingsOverlayElement.classList.add('hidden');
                 }
+            });
+
+            // Theme selector
+            this.themeSelectElement.value = this.theme;
+            this.themeSelectElement.addEventListener('change', (e) => {
+                this.theme = e.target.value;
+                localStorage.setItem('qmlplayground-theme', this.theme);
+                this._applyTheme();
             });
 
             // Build mode selector
