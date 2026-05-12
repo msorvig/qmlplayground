@@ -1,6 +1,24 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+#include <QFont>
+#include <QFontDatabase>
 #include "qmlruntime.h"
+
+static void registerBundledFonts()
+{
+    const char *paths[] = {
+        ":/fonts/TitilliumWeb-Regular.ttf",
+        ":/fonts/TitilliumWeb-SemiBold.ttf",
+        ":/fonts/TitilliumWeb-Bold.ttf",
+    };
+    for (const char *p : paths) {
+        if (QFontDatabase::addApplicationFont(QString::fromLatin1(p)) < 0)
+            qWarning("Failed to load bundled font: %s", p);
+    }
+    QFont f = QGuiApplication::font();
+    f.setFamily(QStringLiteral("Titillium Web"));
+    QGuiApplication::setFont(f);
+}
 
 #ifdef Q_OS_WASM
 #include <emscripten/bind.h>
@@ -103,6 +121,8 @@ int main(int argc, char *argv[])
     heapArgv[argc] = nullptr;
 
     g_app = new QGuiApplication(heapArgc, heapArgv);
+
+    registerBundledFonts();
 
     g_runtime = new QmlRuntime();
 

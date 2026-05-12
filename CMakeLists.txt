@@ -15,6 +15,15 @@ qt_add_executable(qmlruntime_wasm
     src/qmlruntime.h
 )
 
+qt_add_resources(qmlruntime_wasm "fonts"
+    PREFIX "/fonts"
+    BASE "${CMAKE_SOURCE_DIR}/3rdparty/titillium-web"
+    FILES
+        3rdparty/titillium-web/TitilliumWeb-Regular.ttf
+        3rdparty/titillium-web/TitilliumWeb-SemiBold.ttf
+        3rdparty/titillium-web/TitilliumWeb-Bold.ttf
+)
+
 if(NOT QMLPLAYGROUND_SHARED)
     # Register imports for static plugin linking
     qt_add_qml_module(qmlruntime_wasm
