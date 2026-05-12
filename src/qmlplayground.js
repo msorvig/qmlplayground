@@ -551,7 +551,7 @@ class QmlPlayground extends EventTarget {
 
             .btn-settings {
                 background: none !important;
-                font-size: x-large;
+                font-size: x-large !important;
                 padding: 4px 8px !important;
                 color: var(--text-secondary);
             }
