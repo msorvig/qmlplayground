@@ -55,10 +55,6 @@ void QmlRuntime::handleComponentStatus()
                 .arg(error.description()));
             emit errorOccurred(error.line(), error.column(), error.description());
         }
-        // Grey out old content on error
-        if (m_rootItem) {
-            m_rootItem->setOpacity(0.3);
-        }
         emit errorsChanged(getErrors());
         emit loaded();
         return;
@@ -72,9 +68,6 @@ void QmlRuntime::handleComponentStatus()
     QObject *obj = m_component->create();
     if (!obj) {
         m_errors.append("Failed to create root object");
-        if (m_rootItem) {
-            m_rootItem->setOpacity(0.3);
-        }
         emit errorsChanged(getErrors());
         return;
     }
@@ -83,9 +76,6 @@ void QmlRuntime::handleComponentStatus()
     if (!newRootItem) {
         m_errors.append("Root object is not a QQuickItem");
         obj->deleteLater();
-        if (m_rootItem) {
-            m_rootItem->setOpacity(0.3);
-        }
         emit errorsChanged(getErrors());
         return;
     }
