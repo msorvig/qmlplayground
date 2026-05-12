@@ -27,3 +27,6 @@ Thumbs.db
 
 # Dist directory (committed on gh_pages, not main)
 dist/
+
+# Claude Code
+.claude/

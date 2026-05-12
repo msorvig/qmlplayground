@@ -127,6 +127,10 @@ if(EMSCRIPTEN)
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                 ${CMAKE_SOURCE_DIR}/examples
                 ${FRONTEND_DIR}/examples
+
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${CMAKE_SOURCE_DIR}/3rdparty/titillium-web
+                ${FRONTEND_DIR}/titillium-web
         )
     endif()
 

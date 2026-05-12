@@ -112,6 +112,38 @@ class QmlPlayground extends EventTarget {
         return localStorage.getItem('qmlplayground-build-mode') || 'static';
     }
 
+    // @font-face inside shadow DOM is not reliably honored across browsers,
+    // so the playground installs its bundled fonts into the document head once.
+    static _injectFonts() {
+        if (document.getElementById('qmlplayground-fonts')) return;
+        const style = document.createElement('style');
+        style.id = 'qmlplayground-fonts';
+        style.textContent = `
+            @font-face {
+                font-family: 'Titillium Web';
+                font-style: normal;
+                font-weight: 400;
+                font-display: swap;
+                src: url('titillium-web/titillium-web-latin-400-normal.woff2') format('woff2');
+            }
+            @font-face {
+                font-family: 'Titillium Web';
+                font-style: normal;
+                font-weight: 600;
+                font-display: swap;
+                src: url('titillium-web/titillium-web-latin-600-normal.woff2') format('woff2');
+            }
+            @font-face {
+                font-family: 'Titillium Web';
+                font-style: normal;
+                font-weight: 700;
+                font-display: swap;
+                src: url('titillium-web/titillium-web-latin-700-normal.woff2') format('woff2');
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     constructor(container) {
         super();
         this.container = container || document.body;
@@ -135,6 +167,8 @@ class QmlPlayground extends EventTarget {
     }
 
     _buildDOM() {
+        QmlPlayground._injectFonts();
+
         // Inject CodeMirror stylesheets into shadow DOM
         const cmStyle = document.createElement('link');
         cmStyle.rel = 'stylesheet';
@@ -164,7 +198,7 @@ class QmlPlayground extends EventTarget {
                 --border: #3c3c3c;
                 --error: #f14c4c;
                 --warning: #cca700;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-family: 'Titillium Web', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 background: var(--bg-primary);
                 color: var(--text-primary);
             }
