@@ -1,14 +1,16 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.Basic
 
 ApplicationWindow {
+    id: window
     visible: true
     title: "Hello, ApplicationWindow"
 
     header: ToolBar {
         Label {
             anchors.centerIn: parent
-            text: parent.parent.title
+            text: window.title
             font.pixelSize: 16
         }
     }
@@ -16,11 +18,6 @@ ApplicationWindow {
     Column {
         anchors.centerIn: parent
         spacing: 12
-
-        Label {
-            text: "Root: " + (parent.parent ? parent.parent.toString() : "?")
-            anchors.horizontalCenter: parent.horizontalCenter
-        }
 
         Button {
             text: "Click me"
