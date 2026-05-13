@@ -1063,6 +1063,10 @@ class QmlPlayground extends EventTarget {
             this._checkErrors();
             this._emit('qmlloaded');
             this._runComplete();
+            if (this._refocusEditorOnLoad && this.editor) {
+                this._refocusEditorOnLoad = false;
+                this.editor.focus();
+            }
         });
 
         await this.runtime.load();
@@ -1146,6 +1150,10 @@ class QmlPlayground extends EventTarget {
 
         console.log('[playground] run: loading QML');
         this._runInFlight = true;
+        // Showing a fresh QQuickWindow (e.g. ApplicationWindow) steals focus
+        // from the editor. Remember whether the user was typing so we can
+        // restore focus once the load completes.
+        this._refocusEditorOnLoad = !!this.editor && this.editor.hasFocus();
 
         try {
             this.runtime.loadQml(source);
