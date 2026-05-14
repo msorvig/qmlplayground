@@ -161,6 +161,57 @@ class QmlEditor extends EventTarget {
         this._silent = prev;
     }
 
+    // Append text at the end of the document via replaceRange so we
+    // don't reset the cursor, scroll, or undo history. Used for token
+    // streaming. Silent variant suppresses the 'change' event so
+    // playground auto-run isn't triggered per token.
+    appendValue(text, { silent = false } = {}) {
+        if (!this.editor || !text) return;
+        const doc = this.editor.getDoc();
+        const lastLine = doc.lastLine();
+        const lastCh = doc.getLine(lastLine).length;
+        const prev = this._silent;
+        if (silent) this._silent = true;
+        doc.replaceRange(text, { line: lastLine, ch: lastCh });
+        this._silent = prev;
+    }
+
+    // "Stream over" mode: instead of clearing then appending, write
+    // the new tokens over whatever is already in the editor starting
+    // at position 0, character by character. Call beginOverwrite()
+    // once, overwrite(delta) per token, finalizeOverwrite() at the
+    // end to truncate any leftover trailing characters.
+    beginOverwrite() {
+        this._overwritePos = 0;
+    }
+
+    overwrite(delta, { silent = false } = {}) {
+        if (!this.editor || !delta) return;
+        const doc = this.editor.getDoc();
+        const totalLen = doc.getValue().length;
+        const start = doc.posFromIndex(this._overwritePos);
+        const endIdx = Math.min(this._overwritePos + delta.length, totalLen);
+        const end = doc.posFromIndex(endIdx);
+        const prev = this._silent;
+        if (silent) this._silent = true;
+        doc.replaceRange(delta, start, end);
+        this._silent = prev;
+        this._overwritePos += delta.length;
+    }
+
+    finalizeOverwrite({ silent = false } = {}) {
+        if (!this.editor) return;
+        const doc = this.editor.getDoc();
+        const totalLen = doc.getValue().length;
+        if (this._overwritePos >= totalLen) return;
+        const start = doc.posFromIndex(this._overwritePos);
+        const end = doc.posFromIndex(totalLen);
+        const prev = this._silent;
+        if (silent) this._silent = true;
+        doc.replaceRange('', start, end);
+        this._silent = prev;
+    }
+
     focus()    { this.editor?.focus(); }
     hasFocus() { return !!this.editor && this.editor.hasFocus(); }
     refresh()  { this.editor?.refresh(); }
