@@ -17,6 +17,10 @@ public:
     ~QmlRuntime();
 
     void loadQml(const QString &source);
+    // Load an entry file from an absolute path (e.g. "/project/Main.qml").
+    // The JS side is expected to have populated that path's parent directory
+    // (e.g. via Emscripten FS.writeFile) with all the project's files.
+    void loadEntryFile(const QString &absolutePath);
     QString getErrors() const;
 
 signals:

@@ -131,6 +131,60 @@ class QmlRuntime extends EventTarget {
         console.log('[qmlruntime] loadQml returned');
     }
 
+    // Load a QmlProject. Writes every file into Emscripten's in-memory FS
+    // under /project/, then asks the C++ runtime to load the entry file
+    // from that path. Lets Qt resolve cross-file imports, qmldir, and
+    // relative image/URL references through normal filesystem plumbing.
+    loadProject(project) {
+        if (!this.ready) throw new Error('Runtime not ready');
+        const FS = this.instance.FS;
+        if (!FS) throw new Error('Emscripten FS not exported from wasm');
+
+        const root = '/project';
+        this._clearDir(FS, root);
+        this._mkdirP(FS, root);
+
+        for (const file of project.files.values()) {
+            const fullPath = `${root}/${file.path}`;
+            const lastSlash = fullPath.lastIndexOf('/');
+            if (lastSlash > 0) this._mkdirP(FS, fullPath.slice(0, lastSlash));
+
+            const data = file.encoding === 'base64'
+                ? Uint8Array.from(atob(file.content), c => c.charCodeAt(0))
+                : file.content;
+            FS.writeFile(fullPath, data);
+        }
+
+        this.instance.loadEntryFile(`${root}/${project.entry}`);
+    }
+
+    _mkdirP(FS, dirPath) {
+        const parts = dirPath.split('/').filter(Boolean);
+        let acc = '';
+        for (const p of parts) {
+            acc += '/' + p;
+            try { FS.mkdir(acc); } catch (_) { /* exists */ }
+        }
+    }
+
+    _clearDir(FS, root) {
+        let entries;
+        try { entries = FS.readdir(root); } catch (_) { return; }
+        for (const e of entries) {
+            if (e === '.' || e === '..') continue;
+            const full = `${root}/${e}`;
+            try {
+                const stat = FS.stat(full);
+                if (FS.isDir(stat.mode)) {
+                    this._clearDir(FS, full);
+                    FS.rmdir(full);
+                } else {
+                    FS.unlink(full);
+                }
+            } catch (_) { /* ignore */ }
+        }
+    }
+
     // Get errors and warnings from last load
     getErrors() {
         if (!this.ready) return [];

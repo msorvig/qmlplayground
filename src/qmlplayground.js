@@ -1046,19 +1046,22 @@ class QmlPlayground extends EventTarget {
         return this.project;
     }
 
-    // Run the current editor content
+    // Run the current project (entry file resolved through MEMFS).
     run() {
         if (!this.runtime?.ready) {
             this._emit('error', { line: 0, column: 0, message: 'Runtime not ready' });
             return;
         }
 
-        const source = this.getValue();
+        // Keep the project's entry content in sync with the editor before
+        // we hand the project to the runtime.
+        this.project.setEntryContent(this.getValue());
+
         this._clearErrors();
         this._setStatus('running');
         this._emit('running');
 
-        console.log('[playground] run: loading QML');
+        console.log('[playground] run: loading project');
         this._runInFlight = true;
         // Showing a fresh QQuickWindow (e.g. ApplicationWindow) steals focus
         // from the editor. Remember whether the user was typing so we can
@@ -1066,7 +1069,7 @@ class QmlPlayground extends EventTarget {
         this._refocusEditorOnLoad = !!this.editor && this.editor.hasFocus();
 
         try {
-            this.runtime.loadQml(source);
+            this.runtime.loadProject(this.project);
             // Don't check errors here — wait for the qmlloaded callback
             // which fires after async plugin loading completes
         } catch (e) {

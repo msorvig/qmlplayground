@@ -47,12 +47,13 @@ await playground.init();
 | Method | Description |
 |--------|-------------|
 | `init()` | Initialize editor and runtime (async) |
-| `getValue()` | Get editor content |
-| `setValue(source)` | Set editor content |
-| `run()` | Run current editor content |
+| `getValue()` | Get the active editor content |
+| `setValue(source)` | Set the active editor content (mirrors into the project's entry file) |
+| `run()` | Hand the project to the runtime and run it |
 | `refresh()` | Refresh editor layout |
 | `getExamples()` | Get loaded examples array |
 | `loadExample(name)` | Load example by name or filename (async) |
+| `getProject()` | Get the current `QmlProject` (see below) |
 
 #### Events
 
@@ -139,7 +140,8 @@ plugins have loaded and types are resolved.
 |--------|-------------|
 | `load()` | Load the Qt runtime (async) |
 | `destroy()` | Tear down the runtime and clean up |
-| `loadQml(source)` | Load QML source; listen for `qmlloaded` when done |
+| `loadQml(source)` | Load a single-string QML source via `QQmlComponent::setData` |
+| `loadProject(project)` | Write a `QmlProject` into Emscripten's MEMFS and load the entry file. Cross-file imports, `qmldir`, and relative URLs resolve through the in-memory filesystem |
 | `getErrors()` | Get errors/warnings from last load |
 | `clear()` | Clear the QML scene |
 
@@ -152,6 +154,88 @@ plugins have loaded and types are resolved.
 | `qmlloaded` | - | QML loading complete (success or error); check `getErrors()` |
 | `error` | `{ line, column, message }` | Individual QML error |
 | `warning` | `{ line, column, message }` | Individual QML warning |
+
+### QmlEditor
+
+CodeMirror-backed QML editor extracted from `QmlPlayground`. Owns the
+CodeMirror instance, the QML language mode, theme selection, and error /
+warning gutter markers. Useful if you want a QML editor without the full
+playground chrome.
+
+```javascript
+import { QmlEditor } from './qmleditor.js';
+
+const textarea = document.querySelector('textarea');
+const editor = new QmlEditor(textarea, { theme: 'dark' });
+await editor.init();
+
+editor.on('change', () => console.log('user edited:', editor.getValue()));
+editor.on('run',    () => console.log('Ctrl/Cmd+Enter pressed'));
+
+editor.setTheme('light');
+editor.addMarker(7, 12, 'unknown property', 'warning');
+```
+
+#### Methods
+
+| Method | Description |
+|--------|-------------|
+| `init()` | Async: load CodeMirror, register the QML mode, instantiate |
+| `getValue()` / `setValue(s, { silent? })` | Read / write content. `{ silent: true }` skips the `change` event |
+| `focus()` / `hasFocus()` | Focus management |
+| `refresh()` | Force a CodeMirror layout recalc |
+| `setTheme('dark' \| 'light')` | Swap the CodeMirror theme to match the host UI |
+| `addMarker(line, column, message, type)` | Place an error / warning marker on a line |
+| `clearMarkers()` | Remove all markers |
+
+#### Events
+
+| Event | Description |
+|-------|-------------|
+| `ready` | Editor instantiated and visible |
+| `change` | User edited the content (not fired during silent `setValue`) |
+| `run` | User pressed Ctrl/Cmd+Enter |
+
+### QmlProject
+
+In-memory model of a (potentially multi-file) QML project. Holds files keyed
+by path, plus a designated `entry` file the runtime loads. JSON
+serialisation follows the `qmlplayground/project/v1` schema. `QmlPlayground`
+holds one by default (single `Main.qml`); pass it to
+`QmlRuntime.loadProject()` to render.
+
+```javascript
+import { QmlProject } from './qmlproject.js';
+
+const project = new QmlProject({ entry: 'Main.qml', name: 'Demo' });
+project.setFileContent('Main.qml', `import QtQuick\nRectangle { color: "steelblue" }`);
+project.addFile('Components/Card.qml', '/* ... */');
+project.addFile('qmldir', 'module Components\nCard 1.0 Components/Card.qml\n');
+
+const json = project.toJSON();          // serialise (v1 schema)
+const copy = QmlProject.fromJSON(json); // round-trip
+```
+
+#### Methods
+
+| Method | Description |
+|--------|-------------|
+| `hasFile(path)` / `getFile(path)` / `getFileContent(path)` | Inspect files |
+| `setFileContent(path, s)` | Update or create a file's content |
+| `addFile(path, s?)` / `removeFile(path)` / `renameFile(from, to)` | Tree mutation |
+| `listPaths()` | All file paths |
+| `setEntry(path)` | Choose which file the runtime loads |
+| `getEntryContent()` / `setEntryContent(s)` | Convenience for the entry file |
+| `toJSON()` / `QmlProject.fromJSON(obj)` | v1 schema serialise / parse |
+
+#### Events
+
+| Event | Detail | Description |
+|-------|--------|-------------|
+| `filechanged` | `{ path }` | File content changed |
+| `fileadded` / `fileremoved` | `{ path }` | Tree changed |
+| `filerenamed` | `{ from, to }` | Rename |
+| `entrychanged` | `{ entry }` | Designated entry file changed |
 
 ## Build Modes
 
@@ -215,8 +299,11 @@ cmake --build build-wasm-shared --target deploy
 dist/
   index.html              Web frontend
   qmlplayground.js
+  qmleditor.js
+  qmlproject.js
   qmlruntime.js
   codemirror.min.js/css
+  titillium-web/          Bundled fonts (woff2)
   examples/
   static/                 Static runtime build
     qmlruntime_wasm.js
@@ -245,6 +332,8 @@ src/
   index.html            Demo page
   main.cpp              C++ entry point
   qmlplayground.js      QmlPlayground component
+  qmleditor.js          QmlEditor (CodeMirror wrapper)
+  qmlproject.js         QmlProject (multi-file QML project model)
   qmlruntime.js         QmlRuntime component
   qmlruntime.cpp/h      QmlRuntime C++ source
   imports.qml           QML imports for static linking
@@ -252,6 +341,7 @@ src/
   qt_plugins.json       Platform plugin preload for shared builds
 3rdparty/
   codemirror/           CodeMirror editor
+  titillium-web/        Bundled Titillium Web font (woff2 + TTF)
 examples/
   index.json            Examples index
   *.qml                 Example files

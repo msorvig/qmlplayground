@@ -40,6 +40,13 @@ void loadQml(const std::string& source)
     }
 }
 
+void loadEntryFile(const std::string& path)
+{
+    if (g_runtime) {
+        g_runtime->loadEntryFile(QString::fromStdString(path));
+    }
+}
+
 std::string getErrors()
 {
     if (g_runtime) {
@@ -99,6 +106,7 @@ void notifyLoaded()
 
 EMSCRIPTEN_BINDINGS(qmlplayground) {
     emscripten::function("loadQml", &loadQml);
+    emscripten::function("loadEntryFile", &loadEntryFile);
     emscripten::function("getErrors", &getErrors);
     emscripten::function("getQtVersion", &getQtVersion);
     emscripten::function("clearContent", &clearContent);

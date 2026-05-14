@@ -3,6 +3,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QFileInfo>
 
 QmlRuntime::QmlRuntime(QObject *parent)
     : QObject(parent)
@@ -36,6 +37,35 @@ void QmlRuntime::loadQml(const QString &source)
     // Create new component from source (keep old root item until success)
     m_component = std::make_unique<QQmlComponent>(m_engine.get());
     m_component->setData(source.toUtf8(), QUrl("qml:///main.qml"));
+
+    if (m_component->isLoading()) {
+        connect(m_component.get(), &QQmlComponent::statusChanged,
+                this, &QmlRuntime::handleComponentStatus);
+    } else {
+        handleComponentStatus();
+    }
+}
+
+void QmlRuntime::loadEntryFile(const QString &absolutePath)
+{
+    clearErrors();
+
+    const QFileInfo fi(absolutePath);
+    const QString projectRoot = fi.absolutePath();
+
+    // Evict any cached compilations of the previous project so files with
+    // the same name pick up new contents.
+    m_engine->clearComponentCache();
+
+    // Files resolve relative to the project root, and module-style imports
+    // (qmldir-based) work when the parent of the module directory is on
+    // the import path.
+    m_engine->setBaseUrl(QUrl::fromLocalFile(projectRoot + QLatin1Char('/')));
+    if (!m_engine->importPathList().contains(projectRoot))
+        m_engine->addImportPath(projectRoot);
+
+    m_component = std::make_unique<QQmlComponent>(m_engine.get());
+    m_component->loadUrl(QUrl::fromLocalFile(absolutePath));
 
     if (m_component->isLoading()) {
         connect(m_component.get(), &QQmlComponent::statusChanged,
