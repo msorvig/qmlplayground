@@ -213,16 +213,16 @@ cmake --build build-wasm-shared --target deploy
 
 ```
 dist/
-  index.html              Web frontend (served from root)
+  index.html              Web frontend
   qmlplayground.js
   qmlruntime.js
   codemirror.min.js/css
   examples/
-  static/                 Static build runtime
+  static/                 Static runtime build
     qmlruntime_wasm.js
     qmlruntime_wasm.wasm
     qtloader.js
-  shared/                 Shared build runtime
+  shared/                 Shared runtime build
     qmlruntime_wasm.js
     qmlruntime_wasm.wasm
     qtloader.js
@@ -237,21 +237,21 @@ dist/
 ## Project Structure
 
 ```
-CMakeLists.txt          Build config (QMLPLAYGROUND_SHARED option)
+CMakeLists.txt          Build spesification and config
 build.sh                Top-level build script for both variants
 cmake/
-  patch_esm.cmake       ES module patching script
+  patch_esm.cmake       qtloader.js ES module patching script
 src/
   index.html            Demo page
-  qmlplayground.js      QmlPlayground component (Shadow DOM)
-  qmlruntime.js         QmlRuntime wrapper (handles static/shared paths)
   main.cpp              C++ entry point
-  qmlruntime.cpp/h      C++ QML runtime
+  qmlplayground.js      QmlPlayground component
+  qmlruntime.js         QmlRuntime component
+  qmlruntime.cpp/h      QmlRuntime C++ source
   imports.qml           QML imports for static linking
   qt.conf               Qt prefix config for shared builds
   qt_plugins.json       Platform plugin preload for shared builds
 3rdparty/
-  codemirror/           CodeMirror editor (MIT license)
+  codemirror/           CodeMirror editor
 examples/
   index.json            Examples index
   *.qml                 Example files
