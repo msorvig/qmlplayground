@@ -126,6 +126,7 @@ if(EMSCRIPTEN)
                 ${CMAKE_SOURCE_DIR}/src/qmlruntime.js
                 ${CMAKE_SOURCE_DIR}/src/qmleditor.js
                 ${CMAKE_SOURCE_DIR}/src/qmlproject.js
+                ${CMAKE_SOURCE_DIR}/src/qmlai.js
                 ${CMAKE_SOURCE_DIR}/src/qmlplayground.js
                 ${FRONTEND_DIR}/
 

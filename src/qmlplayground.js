@@ -3,6 +3,16 @@
 import { QmlRuntime } from './qmlruntime.js';
 import { QmlEditor } from './qmleditor.js';
 import { QmlProject } from './qmlproject.js';
+import { QmlAI, QMLAI_MODELS, QMLAI_DEFAULT_MODEL, hasWebGPU } from './qmlai.js';
+
+const AI_SAMPLE_PROMPTS = [
+    'A button that fades to a different color when hovered',
+    'A simple analog clock with hour, minute, and second hands',
+    'A pulsing circle animation on a dark background',
+    'A list of weather cards with city, temperature, and icon',
+    'A sliding side drawer with three navigation links',
+    'A spinning 3D cube on a gradient background',
+];
 
 class QmlPlayground extends EventTarget {
     static getBuildMode() {
@@ -15,6 +25,14 @@ class QmlPlayground extends EventTarget {
 
     static getExperimentalExamples() {
         return localStorage.getItem('qmlplayground-experimental-examples') === 'true';
+    }
+
+    static getAIEnabled() {
+        return localStorage.getItem('qmlplayground-ai-enabled') === 'true';
+    }
+
+    static getAIModel() {
+        return localStorage.getItem('qmlplayground-ai-model') || QMLAI_DEFAULT_MODEL;
     }
 
     static _resolveTheme(theme) {
@@ -74,6 +92,7 @@ class QmlPlayground extends EventTarget {
         this.editor = null;
         this.project = new QmlProject({ entry: 'Main.qml' });
         this.activePath = this.project.entry; // file currently shown in the editor
+        this.ai = new QmlAI({ modelId: QmlPlayground.getAIModel() });
         this._autoRunTimeout = null;
         this._examples = [];
 
@@ -648,6 +667,191 @@ class QmlPlayground extends EventTarget {
                 width: 100%;
             }
 
+            /* AI mode */
+            .btn-ai {
+                background: linear-gradient(135deg, #9aa0ff 0%, #5f73ff 100%) !important;
+                color: white;
+            }
+
+            .btn-ai.hidden {
+                display: none;
+            }
+
+            .ai-panel {
+                background: var(--bg-secondary);
+                border-bottom: 1px solid var(--border);
+                padding: 8px 10px;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                flex-shrink: 0;
+            }
+
+            .ai-panel.hidden {
+                display: none;
+            }
+
+            .ai-panel-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .ai-model {
+                flex: 1;
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-radius: 4px;
+                padding: 6px 8px;
+                font-size: 12px;
+                font-family: inherit;
+            }
+
+            .ai-prompt {
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-radius: 4px;
+                padding: 8px 10px;
+                font-size: 13px;
+                font-family: inherit;
+                line-height: 1.4;
+                resize: vertical;
+                min-height: 56px;
+            }
+
+            .ai-prompt:focus {
+                outline: none;
+                border-color: var(--accent);
+            }
+
+            .ai-status {
+                flex: 1;
+                font-size: 12px;
+                color: var(--text-secondary);
+                min-height: 16px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .btn-ai-suggestions {
+                padding: 6px 10px;
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+            }
+
+            .btn-ai-suggestions:hover {
+                border-color: var(--accent);
+            }
+
+            .btn-ai-generate {
+                padding: 6px 14px;
+                background: var(--accent);
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            .btn-ai-generate:hover {
+                background: var(--accent-hover);
+            }
+
+            .btn-ai-generate:disabled {
+                background: var(--bg-tertiary);
+                color: var(--text-secondary);
+                cursor: wait;
+            }
+
+            .ai-progress {
+                height: 4px;
+                background: var(--bg-tertiary);
+                border-radius: 2px;
+                overflow: hidden;
+            }
+
+            .ai-progress.hidden {
+                display: none;
+            }
+
+            .ai-progress-bar {
+                height: 100%;
+                width: 0;
+                background: var(--accent);
+                transition: width 0.15s linear;
+            }
+
+            /* Suggestions popover */
+            .ai-suggestions-overlay {
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 200;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .ai-suggestions-overlay.hidden {
+                display: none;
+            }
+
+            .ai-suggestions-dialog {
+                background: var(--bg-secondary);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                width: 440px;
+                max-width: 90vw;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            }
+
+            .ai-suggestions-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 16px;
+                border-bottom: 1px solid var(--border);
+                font-size: 14px;
+                font-weight: 500;
+            }
+
+            .ai-suggestions-header button {
+                background: none !important;
+                color: var(--text-secondary);
+                font-size: 20px;
+                padding: 0 4px !important;
+            }
+
+            .ai-samples {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                padding: 12px 16px;
+            }
+
+            .ai-samples button {
+                background: var(--bg-tertiary) !important;
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-radius: 4px;
+                padding: 8px 12px;
+                font-size: 13px;
+                text-align: left;
+                cursor: pointer;
+            }
+
+            .ai-samples button:hover {
+                border-color: var(--accent);
+            }
+
             .btn-apply-logging:hover {
                 background: var(--accent-hover);
             }
@@ -672,6 +876,7 @@ class QmlPlayground extends EventTarget {
                         <input type="checkbox" class="auto-run-checkbox" checked>
                         Auto
                     </label>
+                    <button class="btn-ai hidden" title="Generate a QML project from a prompt">AI mode</button>
                 </div>
                 <div class="toolbar-title">QML Playground</div>
                 <div class="toolbar-right">
@@ -721,14 +926,40 @@ class QmlPlayground extends EventTarget {
                         <div class="settings-label">Experimental</div>
                         <div class="settings-checkboxes">
                             <label><input type="checkbox" class="settings-experimental-examples"> Show experimental examples</label>
+                            <label><input type="checkbox" class="settings-ai-enabled"> Enable AI mode (stubbed; real WebLLM hookup later)</label>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="ai-suggestions-overlay hidden">
+                <div class="ai-suggestions-dialog">
+                    <div class="ai-suggestions-header">
+                        <span>Suggestions</span>
+                        <button class="btn-ai-suggestions-close">&times;</button>
+                    </div>
+                    <div class="ai-samples"></div>
                 </div>
             </div>
 
             <div class="main-container">
                 <div class="file-tree hidden"></div>
                 <div class="editor-pane">
+                    <div class="ai-panel hidden">
+                        <div class="ai-panel-row">
+                            <select class="ai-model"></select>
+                        </div>
+                        <textarea class="ai-prompt" rows="3"
+                            placeholder="Describe a QML scene — e.g. A button that fades to a different color when hovered"></textarea>
+                        <div class="ai-panel-row">
+                            <button class="btn-ai-suggestions" type="button">Suggestions</button>
+                            <span class="ai-status"></span>
+                            <button class="btn-ai-generate" type="button">Generate</button>
+                        </div>
+                        <div class="ai-progress hidden">
+                            <div class="ai-progress-bar"></div>
+                        </div>
+                    </div>
                     <textarea class="editor-textarea"></textarea>
                 </div>
                 <div class="resizer"></div>
@@ -773,9 +1004,22 @@ class QmlPlayground extends EventTarget {
         this.themeSelectElement = this.shadow.querySelector('.settings-theme');
         this.buildModeSelectElement = this.shadow.querySelector('.settings-build-mode');
         this.experimentalExamplesElement = this.shadow.querySelector('.settings-experimental-examples');
+        this.aiEnabledElement = this.shadow.querySelector('.settings-ai-enabled');
         this.loggingRulesElement = this.shadow.querySelector('.settings-logging-rules');
-        this.loggingCheckboxes = this.shadow.querySelectorAll('.settings-checkboxes input[type="checkbox"]');
+        this.loggingCheckboxes = this.shadow.querySelectorAll('.settings-checkboxes input[type="checkbox"][data-rule]');
         this.applyLoggingElement = this.shadow.querySelector('.btn-apply-logging');
+        this.aiButtonElement = this.shadow.querySelector('.btn-ai');
+        this.aiPanelElement = this.shadow.querySelector('.ai-panel');
+        this.aiModelElement = this.shadow.querySelector('.ai-model');
+        this.aiPromptElement = this.shadow.querySelector('.ai-prompt');
+        this.aiSamplesElement = this.shadow.querySelector('.ai-samples');
+        this.aiStatusElement = this.shadow.querySelector('.ai-status');
+        this.aiProgressElement = this.shadow.querySelector('.ai-progress');
+        this.aiProgressBarElement = this.shadow.querySelector('.ai-progress-bar');
+        this.aiGenerateElement = this.shadow.querySelector('.btn-ai-generate');
+        this.aiSuggestionsButtonElement = this.shadow.querySelector('.btn-ai-suggestions');
+        this.aiSuggestionsOverlayElement = this.shadow.querySelector('.ai-suggestions-overlay');
+        this.aiSuggestionsCloseElement = this.shadow.querySelector('.btn-ai-suggestions-close');
     }
 
     // Initialize the playground
@@ -885,6 +1129,17 @@ class QmlPlayground extends EventTarget {
                     this._buildExamplesDropdown();
                 });
             }
+
+            // AI mode toggle
+            if (this.aiEnabledElement) {
+                this.aiEnabledElement.checked = QmlPlayground.getAIEnabled();
+                this._applyAIVisibility();
+                this.aiEnabledElement.addEventListener('change', (e) => {
+                    localStorage.setItem('qmlplayground-ai-enabled', e.target.checked);
+                    this._applyAIVisibility();
+                });
+            }
+            this._initAIDialog();
 
             // Logging rules
             const savedRules = localStorage.getItem('qmlplayground-logging-rules') || '';
@@ -1243,6 +1498,129 @@ class QmlPlayground extends EventTarget {
 
     getExamples() {
         return this._examples;
+    }
+
+    // ---- AI mode ----
+
+    _applyAIVisibility() {
+        const enabled = QmlPlayground.getAIEnabled();
+        this.aiButtonElement?.classList.toggle('hidden', !enabled);
+        if (!enabled && this.aiPanelElement)
+            this.aiPanelElement.classList.add('hidden');
+    }
+
+    _initAIDialog() {
+        if (!this.aiButtonElement || !this.aiPanelElement) return;
+
+        // Populate model selector
+        if (this.aiModelElement) {
+            this.aiModelElement.innerHTML = '';
+            for (const m of QMLAI_MODELS) {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.label;
+                this.aiModelElement.appendChild(opt);
+            }
+            this.aiModelElement.value = QmlPlayground.getAIModel();
+            this.aiModelElement.addEventListener('change', (e) => {
+                localStorage.setItem('qmlplayground-ai-model', e.target.value);
+                this.ai.setModel(e.target.value);
+                this._setAIStatus('Model will load on next Generate.');
+            });
+        }
+
+        // Populate sample prompts (in the Suggestions popover)
+        if (this.aiSamplesElement) {
+            this.aiSamplesElement.innerHTML = '';
+            for (const sample of AI_SAMPLE_PROMPTS) {
+                const btn = document.createElement('button');
+                btn.textContent = sample;
+                btn.addEventListener('click', () => {
+                    if (this.aiPromptElement) {
+                        this.aiPromptElement.value = sample;
+                        this.aiPromptElement.focus();
+                    }
+                    this._closeSuggestions();
+                });
+                this.aiSamplesElement.appendChild(btn);
+            }
+        }
+
+        // Toolbar AI button toggles the inline panel
+        this.aiButtonElement.addEventListener('click', () => {
+            const hidden = this.aiPanelElement.classList.toggle('hidden');
+            if (!hidden) {
+                this.aiPromptElement?.focus();
+                this.editor?.refresh();
+            }
+        });
+
+        // Suggestions popover open/close
+        const openSug = () => {
+            this.aiSuggestionsOverlayElement?.classList.remove('hidden');
+        };
+        this.aiSuggestionsButtonElement?.addEventListener('click', openSug);
+        this.aiSuggestionsCloseElement?.addEventListener('click', () => this._closeSuggestions());
+        this.aiSuggestionsOverlayElement?.addEventListener('click', (e) => {
+            if (e.target === this.aiSuggestionsOverlayElement) this._closeSuggestions();
+        });
+
+        this.aiGenerateElement?.addEventListener('click', async () => {
+            const prompt = this.aiPromptElement?.value.trim() || '';
+            if (!prompt) {
+                this._setAIStatus('Enter a prompt first.');
+                return;
+            }
+            if (!await hasWebGPU()) {
+                this._setAIStatus('WebGPU is not available in this browser.');
+                return;
+            }
+
+            this.aiGenerateElement.disabled = true;
+            this._setAIProgress(null, 'Preparing…');
+
+            let streamed = '';
+            try {
+                const json = await this.ai.generate(prompt, {
+                    onLoadProgress: ({ progress, text }) => {
+                        this._setAIProgress(progress, text);
+                    },
+                    onToken: (delta) => {
+                        streamed += delta;
+                        this._setAIStatus(`Generating… ${streamed.length} chars`);
+                    },
+                });
+                this._setAIProgress(null, '');
+                this._loadProjectObject(json);
+                this.log(`AI generated project: ${json.name}`);
+                this.run();
+            } catch (e) {
+                this._setAIProgress(null, 'Error: ' + e.message);
+                this.log(`AI generate error: ${e.message}`, 'error');
+            } finally {
+                this.aiGenerateElement.disabled = false;
+            }
+        });
+    }
+
+    _setAIStatus(msg) {
+        if (this.aiStatusElement) this.aiStatusElement.textContent = msg;
+    }
+
+    _closeSuggestions() {
+        this.aiSuggestionsOverlayElement?.classList.add('hidden');
+    }
+
+    _setAIProgress(progress, text) {
+        if (this.aiStatusElement) this.aiStatusElement.textContent = text || '';
+        if (!this.aiProgressElement || !this.aiProgressBarElement) return;
+        if (progress == null) {
+            this.aiProgressElement.classList.add('hidden');
+            this.aiProgressBarElement.style.width = '0%';
+        } else {
+            this.aiProgressElement.classList.remove('hidden');
+            this.aiProgressBarElement.style.width = (progress * 100).toFixed(1) + '%';
+        }
     }
 
     // Load a specific example by name or file. Examples can be single-file
