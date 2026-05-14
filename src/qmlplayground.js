@@ -932,15 +932,19 @@ class QmlPlayground extends EventTarget {
         this.resizerElement.addEventListener('pointermove', (e) => {
             if (!this.resizerElement.hasPointerCapture(e.pointerId)) return;
 
-            const container = this.editorPaneElement.parentElement;
-            const containerRect = container.getBoundingClientRect();
-            const percentage = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+            // Compute the new editor width from its own left edge, not the
+            // container's — there may be a file tree (or other sibling) to
+            // the left of the editor pane.
+            const editorRect = this.editorPaneElement.getBoundingClientRect();
+            const containerRect = this.editorPaneElement.parentElement.getBoundingClientRect();
+            const minEditor = 200;
+            const minPreview = 200;
+            const maxEditor = containerRect.right - editorRect.left - minPreview;
+            const newWidth = Math.max(minEditor, Math.min(maxEditor, e.clientX - editorRect.left));
 
-            if (percentage > 20 && percentage < 80) {
-                this.editorPaneElement.style.flex = 'none';
-                this.editorPaneElement.style.width = percentage + '%';
-                this.previewPaneElement.style.flex = '1';
-            }
+            this.editorPaneElement.style.flex = 'none';
+            this.editorPaneElement.style.width = newWidth + 'px';
+            this.previewPaneElement.style.flex = '1';
         });
 
         this.resizerElement.addEventListener('pointerup', (e) => {
