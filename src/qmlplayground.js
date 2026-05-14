@@ -2,6 +2,7 @@
 
 import { QmlRuntime } from './qmlruntime.js';
 import { QmlEditor } from './qmleditor.js';
+import { QmlProject } from './qmlproject.js';
 
 class QmlPlayground extends EventTarget {
     static getBuildMode() {
@@ -71,6 +72,7 @@ class QmlPlayground extends EventTarget {
         // Internal state
         this.runtime = null;
         this.editor = null;
+        this.project = new QmlProject({ entry: 'Main.qml' });
         this._autoRunTimeout = null;
         this._examples = [];
 
@@ -741,6 +743,10 @@ class QmlPlayground extends EventTarget {
         this.editor.on('run', () => this.run());
 
         this.editor.on('change', () => {
+            // Mirror the editor into the project's entry file so the project
+            // model stays in sync. (Multi-file editing will swap files later.)
+            this.project.setEntryContent(this.editor.getValue());
+
             if (!this.autoRun || !this.runtime?.ready) return;
 
             if (this._runInFlight) {
@@ -1021,17 +1027,23 @@ class QmlPlayground extends EventTarget {
         this.consoleElement.scrollTop = this.consoleElement.scrollHeight;
     }
 
-    // Get/set editor content
+    // Get/set editor content. The QmlProject mirrors the editor; for now
+    // there is one file (the entry) so getValue reads either.
     getValue() {
         return this.editor?.getValue() ?? '';
     }
 
     _setValue(source) {
         this.editor?.setValue(source, { silent: true });
+        this.project.setEntryContent(source);
     }
 
     setValue(source) {
         this._setValue(source);
+    }
+
+    getProject() {
+        return this.project;
     }
 
     // Run the current editor content
