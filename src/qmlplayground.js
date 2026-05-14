@@ -927,6 +927,10 @@ class QmlPlayground extends EventTarget {
             this.resizerElement.setPointerCapture(e.pointerId);
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
+            // Suspend Qt canvas resize while dragging — see QmlRuntime
+            // setResizeEnabled. Avoids per-frame black flash from the WebGL
+            // buffer-clear.
+            this.runtime?.setResizeEnabled(false);
         });
 
         this.resizerElement.addEventListener('pointermove', (e) => {
@@ -952,6 +956,7 @@ class QmlPlayground extends EventTarget {
                 this.resizerElement.releasePointerCapture(e.pointerId);
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
+                this.runtime?.setResizeEnabled(true);
                 this.refresh();
             }
         });

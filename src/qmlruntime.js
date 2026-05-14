@@ -23,6 +23,8 @@ class QmlRuntime extends EventTarget {
         this.ready = false;
         this._loadStartTime = null;
         this._resizeObserver = null;
+        this._resizeEnabled = true;
+        this._pendingResizeEntry = null;
     }
 
     // Load the Qt runtime
@@ -77,12 +79,19 @@ class QmlRuntime extends EventTarget {
                 this._emit('qmlloaded');
             });
 
-            // Set up resize observer to notify Qt of container size changes
-            // TODO: repaint during resize not working - investigate RAF callbacks
+            // Notify Qt of container size changes. When resize is disabled
+            // (e.g. during an active splitter drag) we record the latest
+            // entry but don't forward it — leaving the canvas backing buffer
+            // at its current size avoids the WebGL-spec buffer-clear that
+            // would otherwise show a black flash between resize and the next
+            // paint. The pending entry is flushed when resize is re-enabled.
             this._resizeObserver = new ResizeObserver((entries) => {
-                for (const entry of entries) {
-                    this.instance.qtResizeAllScreens(entry);
+                const entry = entries[entries.length - 1];
+                if (!this._resizeEnabled) {
+                    this._pendingResizeEntry = entry;
+                    return;
                 }
+                this.instance.qtResizeAllScreens(entry);
             });
             this._resizeObserver.observe(this.container);
 
@@ -118,6 +127,19 @@ class QmlRuntime extends EventTarget {
         // Clear container DOM (canvases, etc.)
         while (this.container.firstChild) {
             this.container.removeChild(this.container.firstChild);
+        }
+    }
+
+    // Pause / resume forwarding ResizeObserver events to Qt. While paused
+    // the canvas backing buffer is left untouched (CSS stretches the
+    // existing pixels), so an in-flight splitter drag doesn't flicker
+    // black. Resume replays the latest pending size, if any.
+    setResizeEnabled(enabled) {
+        if (this._resizeEnabled === enabled) return;
+        this._resizeEnabled = enabled;
+        if (enabled && this._pendingResizeEntry && this.instance) {
+            this.instance.qtResizeAllScreens(this._pendingResizeEntry);
+            this._pendingResizeEntry = null;
         }
     }
 
