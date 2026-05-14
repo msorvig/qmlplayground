@@ -124,6 +124,7 @@ if(EMSCRIPTEN)
             COMMAND ${CMAKE_COMMAND} -E copy
                 ${CMAKE_SOURCE_DIR}/src/index.html
                 ${CMAKE_SOURCE_DIR}/src/qmlruntime.js
+                ${CMAKE_SOURCE_DIR}/src/qmleditor.js
                 ${CMAKE_SOURCE_DIR}/src/qmlplayground.js
                 ${FRONTEND_DIR}/
 

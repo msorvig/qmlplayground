@@ -1,111 +1,7 @@
 // QmlPlayground - Self-contained QML playground component with Shadow DOM
 
 import { QmlRuntime } from './qmlruntime.js';
-
-// Load CodeMirror dynamically
-async function loadCodeMirror() {
-    if (typeof CodeMirror !== 'undefined') return;
-
-    await new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'codemirror.min.js';
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-    });
-}
-
-// Register QML mode for CodeMirror
-function registerQmlMode() {
-    if (CodeMirror.modes.qml) return;
-
-    CodeMirror.defineMode("qml", function(config) {
-        const keywords = [
-            "import", "as", "on", "property", "alias", "signal", "readonly",
-            "default", "required", "component"
-        ];
-        const jsKeywords = [
-            "var", "let", "const", "function", "return", "if", "else", "for",
-            "while", "do", "switch", "case", "break", "continue", "try",
-            "catch", "finally", "throw", "new", "typeof", "instanceof", "in",
-            "true", "false", "null", "undefined", "this"
-        ];
-        const types = [
-            "int", "real", "double", "string", "bool", "var", "url", "color",
-            "date", "point", "size", "rect", "list", "variant"
-        ];
-        const qmlTypes = [
-            "Item", "Rectangle", "Text", "Image", "MouseArea", "Column", "Row",
-            "Grid", "Flow", "ListView", "GridView", "Repeater", "Loader",
-            "Component", "Timer", "Animation", "PropertyAnimation",
-            "NumberAnimation", "ColorAnimation", "RotationAnimation",
-            "SequentialAnimation", "ParallelAnimation", "Behavior",
-            "State", "Transition", "Canvas", "Window", "ApplicationWindow"
-        ];
-
-        function tokenBase(stream, state) {
-            const ch = stream.peek();
-            if (ch === "/") {
-                stream.next();
-                if (stream.eat("/")) { stream.skipToEnd(); return "comment"; }
-                if (stream.eat("*")) { state.tokenize = tokenComment; return tokenComment(stream, state); }
-                stream.backUp(1);
-            }
-            if (ch === '"' || ch === "'") {
-                stream.next();
-                state.tokenize = tokenString(ch);
-                return state.tokenize(stream, state);
-            }
-            if (/\d/.test(ch)) {
-                stream.match(/^\d*\.?\d*([eE][+-]?\d+)?/);
-                return "number";
-            }
-            if (/[\w_]/.test(ch)) {
-                stream.match(/^[\w_]+/);
-                const word = stream.current();
-                if (keywords.includes(word)) return "keyword";
-                if (jsKeywords.includes(word)) return "keyword";
-                if (types.includes(word)) return "type";
-                if (qmlTypes.includes(word)) return "type";
-                if (/^[A-Z]/.test(word)) return "type";
-                if (stream.peek() === ':') return "property";
-                return "variable";
-            }
-            if (/[+\-*/%=<>!&|^~?:]/.test(ch)) { stream.next(); return "operator"; }
-            if (/[{}\[\]()]/.test(ch)) { stream.next(); return "bracket"; }
-            stream.next();
-            return null;
-        }
-
-        function tokenString(quote) {
-            return function(stream, state) {
-                let escaped = false, ch;
-                while ((ch = stream.next()) != null) {
-                    if (ch === quote && !escaped) { state.tokenize = tokenBase; break; }
-                    escaped = !escaped && ch === "\\";
-                }
-                return "string";
-            };
-        }
-
-        function tokenComment(stream, state) {
-            let ch;
-            while ((ch = stream.next()) != null) {
-                if (ch === "*" && stream.eat("/")) { state.tokenize = tokenBase; break; }
-            }
-            return "comment";
-        }
-
-        return {
-            startState: () => ({ tokenize: tokenBase }),
-            token: (stream, state) => stream.eatSpace() ? null : state.tokenize(stream, state),
-            lineComment: "//",
-            blockCommentStart: "/*",
-            blockCommentEnd: "*/"
-        };
-    });
-    CodeMirror.defineMIME("text/x-qml", "qml");
-}
+import { QmlEditor } from './qmleditor.js';
 
 class QmlPlayground extends EventTarget {
     static getBuildMode() {
@@ -176,8 +72,6 @@ class QmlPlayground extends EventTarget {
         this.runtime = null;
         this.editor = null;
         this._autoRunTimeout = null;
-        this._suppressAutoRun = false;
-        this._errorMarkers = [];
         this._examples = [];
 
         this._buildDOM();
@@ -188,9 +82,7 @@ class QmlPlayground extends EventTarget {
         if (this.container && this.container.setAttribute) {
             this.container.setAttribute('data-theme', resolved);
         }
-        if (this.editor) {
-            this.editor.setOption('theme', resolved === 'light' ? 'default' : 'gruvbox-dark');
-        }
+        this.editor?.setTheme(resolved);
     }
 
     _buildDOM() {
@@ -830,9 +722,7 @@ class QmlPlayground extends EventTarget {
 
     // Initialize the playground
     async init() {
-        await loadCodeMirror();
-        registerQmlMode();
-        this._initEditor();
+        await this._initEditor();
         this._initUI();
         this._initResizer();
         await this._initRuntime();
@@ -841,40 +731,23 @@ class QmlPlayground extends EventTarget {
         return this;
     }
 
-    // Initialize CodeMirror editor
-    _initEditor() {
+    async _initEditor() {
         if (!this.editorElement) return;
 
-        this.editor = CodeMirror.fromTextArea(this.editorElement, {
-            mode: 'qml',
-            theme: 'gruvbox-dark',
-            lineNumbers: true,
-            gutters: ['CodeMirror-linenumbers', 'error-gutter'],
-            indentUnit: 4,
-            tabSize: 4,
-            indentWithTabs: false,
-            autoCloseBrackets: true,
-            matchBrackets: true,
-            extraKeys: {
-                'Ctrl-Enter': () => this.run(),
-                'Cmd-Enter': () => this.run(),
-            }
-        });
+        const resolved = QmlPlayground._resolveTheme(this.theme);
+        this.editor = new QmlEditor(this.editorElement, { theme: resolved });
+        await this.editor.init();
 
-        // Auto-run on change with debounce
+        this.editor.on('run', () => this.run());
+
         this.editor.on('change', () => {
-            if (!this.autoRun || !this.runtime?.ready || this._suppressAutoRun) return;
+            if (!this.autoRun || !this.runtime?.ready) return;
 
             if (this._runInFlight) {
-                // A run is in progress — schedule a re-run when it completes
                 this._runPending = true;
                 return;
             }
-
-            // Debounce rapid keystrokes (e.g. paste, hold key)
-            if (this._autoRunTimeout) {
-                clearTimeout(this._autoRunTimeout);
-            }
+            if (this._autoRunTimeout) clearTimeout(this._autoRunTimeout);
             this._autoRunTimeout = setTimeout(() => this.run(), 50);
         });
 
@@ -1154,11 +1027,7 @@ class QmlPlayground extends EventTarget {
     }
 
     _setValue(source) {
-        if (this.editor) {
-            this._suppressAutoRun = true;
-            this.editor.setValue(source);
-            this._suppressAutoRun = false;
-        }
+        this.editor?.setValue(source, { silent: true });
     }
 
     setValue(source) {
@@ -1229,37 +1098,12 @@ class QmlPlayground extends EventTarget {
         }
     }
 
-    // Show error/warning in editor gutter
     _showIssue(issue) {
-        if (!this.editor || issue.line <= 0) return;
-
-        const lineIndex = issue.line - 1;
-        const type = issue.type || 'error';
-        const marker = this._makeMarker(issue.message, type);
-
-        this.editor.setGutterMarker(lineIndex, 'error-gutter', marker);
-        const bgClass = type === 'warning' ? 'warning-line-bg' : 'error-line-bg';
-        this.editor.addLineClass(lineIndex, 'background', bgClass);
-        this._errorMarkers.push({ line: lineIndex, type });
-    }
-
-    _makeMarker(message, type) {
-        const marker = document.createElement('div');
-        marker.className = type === 'warning' ? 'warning-marker' : 'error-marker';
-        marker.innerHTML = '●';
-        marker.setAttribute('data-tooltip', message);
-        return marker;
+        this.editor?.addMarker(issue.line, issue.column, issue.message, issue.type || 'error');
     }
 
     _clearErrors() {
-        if (!this.editor) return;
-
-        for (const item of this._errorMarkers) {
-            this.editor.setGutterMarker(item.line, 'error-gutter', null);
-            this.editor.removeLineClass(item.line, 'background', 'error-line-bg');
-            this.editor.removeLineClass(item.line, 'background', 'warning-line-bg');
-        }
-        this._errorMarkers = [];
+        this.editor?.clearMarkers();
     }
 
     // Refresh editor layout
