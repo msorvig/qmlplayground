@@ -116,6 +116,10 @@ class QmlPlayground extends EventTarget {
         return localStorage.getItem('qmlplayground-theme') || 'dark';
     }
 
+    static getExperimentalExamples() {
+        return localStorage.getItem('qmlplayground-experimental-examples') === 'true';
+    }
+
     static _resolveTheme(theme) {
         if (theme === 'system') {
             return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
@@ -336,6 +340,16 @@ class QmlPlayground extends EventTarget {
 
             .examples-dropdown.hidden {
                 display: none;
+            }
+
+            .examples-dropdown-header {
+                padding: 8px 16px 4px;
+                font-size: 11px;
+                color: var(--text-secondary);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                border-top: 1px solid var(--border);
+                margin-top: 4px;
             }
 
             .examples-dropdown button {
@@ -755,6 +769,11 @@ class QmlPlayground extends EventTarget {
                         <textarea class="settings-logging-rules" rows="3"
                             placeholder="e.g. qt.qml.import.debug=true"></textarea>
                         <button class="btn-apply-logging">Apply (reloads runtime)</button>
+                        <div class="settings-divider"></div>
+                        <div class="settings-label">Experimental</div>
+                        <div class="settings-checkboxes">
+                            <label><input type="checkbox" class="settings-experimental-examples"> Show experimental examples</label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -803,6 +822,7 @@ class QmlPlayground extends EventTarget {
         this.settingsCloseElement = this.shadow.querySelector('.btn-settings-close');
         this.themeSelectElement = this.shadow.querySelector('.settings-theme');
         this.buildModeSelectElement = this.shadow.querySelector('.settings-build-mode');
+        this.experimentalExamplesElement = this.shadow.querySelector('.settings-experimental-examples');
         this.loggingRulesElement = this.shadow.querySelector('.settings-logging-rules');
         this.loggingCheckboxes = this.shadow.querySelectorAll('.settings-checkboxes input[type="checkbox"]');
         this.applyLoggingElement = this.shadow.querySelector('.btn-apply-logging');
@@ -921,6 +941,15 @@ class QmlPlayground extends EventTarget {
                 this.settingsOverlayElement.classList.add('hidden');
                 this._loadRuntime(mode);
             });
+
+            // Experimental examples toggle
+            if (this.experimentalExamplesElement) {
+                this.experimentalExamplesElement.checked = QmlPlayground.getExperimentalExamples();
+                this.experimentalExamplesElement.addEventListener('change', (e) => {
+                    localStorage.setItem('qmlplayground-experimental-examples', e.target.checked);
+                    this._buildExamplesDropdown();
+                });
+            }
 
             // Logging rules
             const savedRules = localStorage.getItem('qmlplayground-logging-rules') || '';
@@ -1261,8 +1290,14 @@ class QmlPlayground extends EventTarget {
     _buildExamplesDropdown() {
         if (!this.examplesDropdownElement) return;
 
+        const showExperimental = QmlPlayground.getExperimentalExamples();
+        const stable = this._examples.filter(e => !e.experimental);
+        const experimental = showExperimental
+            ? this._examples.filter(e => e.experimental)
+            : [];
+
         this.examplesDropdownElement.innerHTML = '';
-        for (const example of this._examples) {
+        const appendItem = (example) => {
             const btn = document.createElement('button');
             btn.textContent = example.name;
             btn.addEventListener('click', () => {
@@ -1270,6 +1305,15 @@ class QmlPlayground extends EventTarget {
                 this.examplesDropdownElement.classList.add('hidden');
             });
             this.examplesDropdownElement.appendChild(btn);
+        };
+
+        stable.forEach(appendItem);
+        if (experimental.length > 0) {
+            const header = document.createElement('div');
+            header.className = 'examples-dropdown-header';
+            header.textContent = 'Experimental';
+            this.examplesDropdownElement.appendChild(header);
+            experimental.forEach(appendItem);
         }
     }
 
