@@ -3,7 +3,7 @@
     { "name": "Animation", "file": "animation.qml" },
     { "name": "Mouse Area", "file": "mousearea.qml" },
     { "name": "Controls", "file": "controls.qml" },
-    { "name": "ApplicationWindow", "file": "applicationwindow.qml" },
+    { "name": "ApplicationWindow", "file": "applicationwindow.qml", "experimental": true },
     { "name": "3D Cube", "file": "cube3d.qml" },
     { "name": "3D Sphere", "file": "sphere3d.qml" },
     { "name": "Particles", "file": "particles.qml" },
