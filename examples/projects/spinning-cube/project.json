@@ -1,0 +1,19 @@
+{
+    "$schema": "qmlplayground/project/v1",
+    "id": "example-spinning-cube",
+    "name": "Spinning Cube",
+    "entry": "Main.qml",
+    "qtModules": ["QtQuick", "QtQuick3D"],
+    "files": [
+        {
+            "path": "Main.qml",
+            "encoding": "utf-8",
+            "content": "import QtQuick\nimport QtQuick3D\n\nRectangle {\n    anchors.fill: parent\n    color: \"#1a1a2e\"\n\n    View3D {\n        anchors.fill: parent\n        environment: SceneEnvironment {\n            clearColor: \"#1a1a2e\"\n            backgroundMode: SceneEnvironment.Color\n            antialiasingMode: SceneEnvironment.MSAA\n        }\n\n        PerspectiveCamera { z: 400 }\n        DirectionalLight {\n            eulerRotation.x: -30\n            eulerRotation.y: -30\n        }\n\n        SpinningCube {\n            scale: Qt.vector3d(1.5, 1.5, 1.5)\n        }\n    }\n\n    Text {\n        anchors.bottom: parent.bottom\n        anchors.horizontalCenter: parent.horizontalCenter\n        anchors.bottomMargin: 20\n        text: \"Edit SpinningCube.qml to change the cube's behavior\"\n        color: \"#808080\"\n        font.pixelSize: 14\n    }\n}\n"
+        },
+        {
+            "path": "SpinningCube.qml",
+            "encoding": "utf-8",
+            "content": "import QtQuick\nimport QtQuick3D\n\nModel {\n    property color cubeColor: \"#0e639c\"\n\n    source: \"#Cube\"\n    materials: PrincipledMaterial {\n        baseColor: cubeColor\n        metalness: 0.5\n        roughness: 0.3\n    }\n\n    NumberAnimation on eulerRotation.y {\n        from: 0; to: 360\n        duration: 4000\n        loops: Animation.Infinite\n    }\n    NumberAnimation on eulerRotation.x {\n        from: 0; to: 360\n        duration: 6000\n        loops: Animation.Infinite\n    }\n}\n"
+        }
+    ]
+}

@@ -11,5 +11,6 @@
     { "name": "Line Graph", "file": "linegraph.qml" },
     { "name": "Shapes", "file": "shapes.qml", "experimental": true },
     { "name": "3D Scene", "file": "scene3d.qml", "experimental": true },
-    { "name": "PathView", "file": "pathview.qml", "experimental": true }
+    { "name": "PathView", "file": "pathview.qml", "experimental": true },
+    { "name": "Spinning Cube (project)", "project": "projects/spinning-cube/project.json", "experimental": true }
 ]

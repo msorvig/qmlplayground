@@ -73,6 +73,7 @@ class QmlPlayground extends EventTarget {
         this.runtime = null;
         this.editor = null;
         this.project = new QmlProject({ entry: 'Main.qml' });
+        this.activePath = this.project.entry; // file currently shown in the editor
         this._autoRunTimeout = null;
         this._examples = [];
 
@@ -210,6 +211,59 @@ class QmlPlayground extends EventTarget {
                 display: flex;
                 flex-direction: column;
                 border-right: 1px solid var(--border);
+            }
+
+            .file-tree {
+                width: 180px;
+                flex-shrink: 0;
+                background: var(--bg-secondary);
+                border-right: 1px solid var(--border);
+                overflow-y: auto;
+                padding: 8px 0;
+            }
+
+            .file-tree.hidden {
+                display: none;
+            }
+
+            .file-tree-title {
+                padding: 4px 12px 8px;
+                font-size: 11px;
+                color: var(--text-secondary);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .file-tree-item {
+                display: block;
+                width: 100%;
+                padding: 6px 12px;
+                background: none;
+                border: none;
+                color: var(--text-primary);
+                text-align: left;
+                cursor: pointer;
+                font-size: 13px;
+                font-family: 'Fira Code', monospace;
+            }
+
+            .file-tree-item:hover {
+                background: var(--bg-tertiary);
+            }
+
+            .file-tree-item.active {
+                background: var(--accent);
+                color: white;
+            }
+
+            .file-tree-item.entry::before {
+                content: '▶ ';
+                color: var(--text-secondary);
+                font-size: 10px;
+            }
+
+            .file-tree-item.active.entry::before {
+                color: rgba(255, 255, 255, 0.8);
             }
 
             .preview-pane {
@@ -673,6 +727,7 @@ class QmlPlayground extends EventTarget {
             </div>
 
             <div class="main-container">
+                <div class="file-tree hidden"></div>
                 <div class="editor-pane">
                     <textarea class="editor-textarea"></textarea>
                 </div>
@@ -697,6 +752,7 @@ class QmlPlayground extends EventTarget {
 
         // Cache element references
         this.editorElement = this.shadow.querySelector('.editor-textarea');
+        this.fileTreeElement = this.shadow.querySelector('.file-tree');
         this.containerElement = this.shadow.querySelector('.qt-container');
         this.statusElement = this.shadow.querySelector('.status-text');
         this.consoleElement = this.shadow.querySelector('.console-content');
@@ -743,9 +799,9 @@ class QmlPlayground extends EventTarget {
         this.editor.on('run', () => this.run());
 
         this.editor.on('change', () => {
-            // Mirror the editor into the project's entry file so the project
-            // model stays in sync. (Multi-file editing will swap files later.)
-            this.project.setEntryContent(this.editor.getValue());
+            // Mirror the editor into the currently-active file in the project
+            // so the project model stays in sync as the user types.
+            this.project.setFileContent(this.activePath, this.editor.getValue());
 
             if (!this.autoRun || !this.runtime?.ready) return;
 
@@ -1035,7 +1091,7 @@ class QmlPlayground extends EventTarget {
 
     _setValue(source) {
         this.editor?.setValue(source, { silent: true });
-        this.project.setEntryContent(source);
+        this.project.setFileContent(this.activePath, source);
     }
 
     setValue(source) {
@@ -1053,9 +1109,9 @@ class QmlPlayground extends EventTarget {
             return;
         }
 
-        // Keep the project's entry content in sync with the editor before
-        // we hand the project to the runtime.
-        this.project.setEntryContent(this.getValue());
+        // Make sure the project reflects any in-flight editor edits before
+        // we hand it to the runtime.
+        this.project.setFileContent(this.activePath, this.getValue());
 
         this._clearErrors();
         this._setStatus('running');
@@ -1180,27 +1236,93 @@ class QmlPlayground extends EventTarget {
         return this._examples;
     }
 
-    // Load a specific example by name or file
+    // Load a specific example by name or file. Examples can be single-file
+    // (entry has "file") or multi-file projects (entry has "project" with a
+    // path to a v1 project.json).
     async loadExample(nameOrFile) {
-        const example = this._examples.find(e => e.name === nameOrFile || e.file === nameOrFile);
+        const example = this._examples.find(e =>
+            e.name === nameOrFile || e.file === nameOrFile || e.project === nameOrFile);
         if (!example) {
             this.log(`Example not found: ${nameOrFile}`, 'error');
             this._emit('error', { line: 0, column: 0, message: `Example not found: ${nameOrFile}` });
             return;
         }
 
+        const baseUrl = this.examplesUrl.replace(/\/[^/]*$/, '/');
         try {
-            const baseUrl = this.examplesUrl.replace(/\/[^/]*$/, '/');
-            const response = await fetch(baseUrl + example.file);
-            if (!response.ok) throw new Error(`Failed to load ${example.file}`);
-            const source = await response.text();
-            this._setValue(source);
-            this.log(`Loaded example: ${example.name}`);
-            this._emit('exampleloaded', { example, source });
-            this.run();
+            if (example.project) {
+                const response = await fetch(baseUrl + example.project);
+                if (!response.ok) throw new Error(`Failed to load ${example.project}`);
+                const obj = await response.json();
+                this._loadProjectObject(obj);
+                this.log(`Loaded project example: ${example.name}`);
+                this._emit('exampleloaded', { example });
+                this.run();
+            } else {
+                const response = await fetch(baseUrl + example.file);
+                if (!response.ok) throw new Error(`Failed to load ${example.file}`);
+                const source = await response.text();
+                // Switch back to a single-file project so the file tree hides.
+                this._loadProjectObject({
+                    $schema: 'qmlplayground/project/v1',
+                    name: example.name,
+                    entry: 'Main.qml',
+                    files: [{ path: 'Main.qml', encoding: 'utf-8', content: source }],
+                });
+                this.log(`Loaded example: ${example.name}`);
+                this._emit('exampleloaded', { example, source });
+                this.run();
+            }
         } catch (e) {
             this.log(`Error loading example: ${e.message}`, 'error');
             this._emit('error', { line: 0, column: 0, message: `Error loading example: ${e.message}` });
+        }
+    }
+
+    // Replace the current project with the given v1 JSON object and refresh
+    // the editor + file tree to reflect it.
+    _loadProjectObject(obj) {
+        this.project = QmlProject.fromJSON(obj);
+        this.activePath = this.project.entry;
+        this._rebuildFileTree();
+        this.editor?.setValue(this.project.getFileContent(this.activePath), { silent: true });
+    }
+
+    // Make `path` the file the editor is editing. Saves any pending edits to
+    // the previously-active file first.
+    setActiveFile(path) {
+        if (path === this.activePath) return;
+        if (!this.project.hasFile(path)) return;
+        // Flush current editor content into the file we're leaving.
+        if (this.editor)
+            this.project.setFileContent(this.activePath, this.editor.getValue());
+        this.activePath = path;
+        this.editor?.setValue(this.project.getFileContent(path), { silent: true });
+        this._rebuildFileTree();
+    }
+
+    _rebuildFileTree() {
+        if (!this.fileTreeElement) return;
+        const multi = this.project.files.size > 1;
+        this.fileTreeElement.classList.toggle('hidden', !multi);
+
+        this.fileTreeElement.innerHTML = '';
+        if (!multi) return;
+
+        const title = document.createElement('div');
+        title.className = 'file-tree-title';
+        title.textContent = this.project.name || 'Project';
+        this.fileTreeElement.appendChild(title);
+
+        for (const path of this.project.listPaths()) {
+            const btn = document.createElement('button');
+            btn.className = 'file-tree-item';
+            if (path === this.activePath) btn.classList.add('active');
+            if (path === this.project.entry) btn.classList.add('entry');
+            btn.textContent = path;
+            btn.title = path === this.project.entry ? `${path} (entry)` : path;
+            btn.addEventListener('click', () => this.setActiveFile(path));
+            this.fileTreeElement.appendChild(btn);
         }
     }
 
