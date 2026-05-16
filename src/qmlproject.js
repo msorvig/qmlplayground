@@ -128,6 +128,27 @@ class QmlProject extends EventTarget {
         };
     }
 
+    // Write every file in this project into an Emscripten-style FS
+     // (e.g. Module.FS) under `root`. Clears the directory first so
+     // stale files from a previous project don't linger. After this
+     // call the runtime can load the entry file via the FS path
+     // `${root}/${entry}`.
+    writeTo(FS, root) {
+        clearDir(FS, root);
+        mkdirP(FS, root);
+
+        for (const file of this.files.values()) {
+            const fullPath = `${root}/${file.path}`;
+            const lastSlash = fullPath.lastIndexOf('/');
+            if (lastSlash > 0) mkdirP(FS, fullPath.slice(0, lastSlash));
+
+            const data = file.encoding === 'base64'
+                ? Uint8Array.from(atob(file.content), c => c.charCodeAt(0))
+                : file.content;
+            FS.writeFile(fullPath, data);
+        }
+    }
+
     static fromJSON(obj) {
         if (!obj || typeof obj !== 'object')
             throw new Error('Project JSON is not an object');
@@ -174,6 +195,37 @@ class QmlProject extends EventTarget {
     on(event, callback) {
         this.addEventListener(event, (e) => callback(e.detail));
         return this;
+    }
+}
+
+// Recursively create `dirPath` in the given Emscripten FS, ignoring
+// "already exists" errors.
+function mkdirP(FS, dirPath) {
+    const parts = dirPath.split('/').filter(Boolean);
+    let acc = '';
+    for (const p of parts) {
+        acc += '/' + p;
+        try { FS.mkdir(acc); } catch (_) { /* exists */ }
+    }
+}
+
+// Recursively unlink everything under `root` (files first, then
+// directories). Silently does nothing if `root` doesn't exist.
+function clearDir(FS, root) {
+    let entries;
+    try { entries = FS.readdir(root); } catch (_) { return; }
+    for (const e of entries) {
+        if (e === '.' || e === '..') continue;
+        const full = `${root}/${e}`;
+        try {
+            const stat = FS.stat(full);
+            if (FS.isDir(stat.mode)) {
+                clearDir(FS, full);
+                FS.rmdir(full);
+            } else {
+                FS.unlink(full);
+            }
+        } catch (_) { /* ignore */ }
     }
 }
 

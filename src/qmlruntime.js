@@ -163,48 +163,8 @@ class QmlRuntime extends EventTarget {
         if (!FS) throw new Error('Emscripten FS not exported from wasm');
 
         const root = '/project';
-        this._clearDir(FS, root);
-        this._mkdirP(FS, root);
-
-        for (const file of project.files.values()) {
-            const fullPath = `${root}/${file.path}`;
-            const lastSlash = fullPath.lastIndexOf('/');
-            if (lastSlash > 0) this._mkdirP(FS, fullPath.slice(0, lastSlash));
-
-            const data = file.encoding === 'base64'
-                ? Uint8Array.from(atob(file.content), c => c.charCodeAt(0))
-                : file.content;
-            FS.writeFile(fullPath, data);
-        }
-
+        project.writeTo(FS, root);
         this.instance.loadEntryFile(`${root}/${project.entry}`);
-    }
-
-    _mkdirP(FS, dirPath) {
-        const parts = dirPath.split('/').filter(Boolean);
-        let acc = '';
-        for (const p of parts) {
-            acc += '/' + p;
-            try { FS.mkdir(acc); } catch (_) { /* exists */ }
-        }
-    }
-
-    _clearDir(FS, root) {
-        let entries;
-        try { entries = FS.readdir(root); } catch (_) { return; }
-        for (const e of entries) {
-            if (e === '.' || e === '..') continue;
-            const full = `${root}/${e}`;
-            try {
-                const stat = FS.stat(full);
-                if (FS.isDir(stat.mode)) {
-                    this._clearDir(FS, full);
-                    FS.rmdir(full);
-                } else {
-                    FS.unlink(full);
-                }
-            } catch (_) { /* ignore */ }
-        }
     }
 
     // Get errors and warnings from last load
