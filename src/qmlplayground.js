@@ -3,43 +3,17 @@
 import { QmlRuntime } from './qmlruntime.js';
 import { QmlEditor } from './qmleditor.js';
 import { QmlProject } from './qmlproject.js';
+import { QmlAI } from './qmlai.js';
 import {
-    QmlAI,
-    QMLAI_MODELS,
-    QMLAI_DEFAULT_MODEL,
-    OPENROUTER_MODELS,
-    OPENROUTER_DEFAULT_MODEL,
-    DEFAULT_SYSTEM_PROMPT,
-    hasWebGPU,
-} from './qmlai.js';
-
-const AI_DEFAULTS = {
-    maxTokens:   1024,
-    temperature: 0.2,
-    maxAttempts: 3,
-};
-
-const AI_SAMPLE_PROMPTS = [
-    'A button that fades to a different color when hovered',
-    'A simple analog clock with hour, minute, and second hands',
-    'A pulsing circle animation on a dark background',
-    'A list of weather cards with city, temperature, and icon',
-    'A sliding side drawer with three navigation links',
-    'A spinning 3D cube on a gradient background',
-];
-
-// Strip a model's fenced markdown wrapper while the buffer is still
-// streaming. Tolerates partial / unclosed fences so the editor doesn't
-// flicker between fenced and unfenced views during streaming.
-function stripFencesProgressive(text) {
-    let s = text;
-    // Drop a leading ```qml / ```QML / ``` fence (with or without lang).
-    const leading = s.match(/^\s*```(?:qml|QML|qt)?\s*\n?/);
-    if (leading) s = s.slice(leading[0].length);
-    // Drop a trailing ``` if the model has emitted it.
-    s = s.replace(/\n?```\s*$/, '');
-    return s;
-}
+    QmlAIUI,
+    getAIModel,
+    getAIOpenRouterKey,
+    getAISystemPrompt,
+    getAILocalEnabled,
+    getAIOpenRouterEnabled,
+    providerForModelId,
+} from './qmlaiui.js';
+import { QMLAI_DEFAULT_MODEL, OPENROUTER_DEFAULT_MODEL } from './qmlai.js';
 
 
 class QmlPlayground extends EventTarget {
@@ -53,63 +27,6 @@ class QmlPlayground extends EventTarget {
 
     static getExperimentalExamples() {
         return localStorage.getItem('qmlplayground-experimental-examples') === 'true';
-    }
-
-    static getAIEnabled() {
-        return QmlPlayground.getAILocalEnabled() || QmlPlayground.getAIOpenRouterEnabled();
-    }
-
-    static getAILocalEnabled() {
-        const v = localStorage.getItem('qmlplayground-ai-local-enabled');
-        return v == null ? true : v === 'true';
-    }
-
-    static getAIOpenRouterEnabled() {
-        return localStorage.getItem('qmlplayground-ai-openrouter-enabled') === 'true';
-    }
-
-    static getAIModel() {
-        return localStorage.getItem('qmlplayground-ai-model') || QMLAI_DEFAULT_MODEL;
-    }
-
-    static getAIOpenRouterKey() {
-        return localStorage.getItem('qmlplayground-ai-openrouter-key') || '';
-    }
-
-    static _providerForModelId(id) {
-        if (QMLAI_MODELS.some(m => m.id === id)) return 'webllm';
-        if (OPENROUTER_MODELS.some(m => m.id === id)) return 'openrouter';
-        // Heuristic: OpenRouter ids are slash-namespaced.
-        return id.includes('/') ? 'openrouter' : 'webllm';
-    }
-
-    static getAISystemPrompt() {
-        return localStorage.getItem('qmlplayground-ai-system-prompt') || DEFAULT_SYSTEM_PROMPT;
-    }
-
-    static _getNumberSetting(key, fallback, { min, max } = {}) {
-        const raw = localStorage.getItem(key);
-        if (raw == null) return fallback;
-        const n = Number(raw);
-        if (!Number.isFinite(n)) return fallback;
-        if (min != null && n < min) return min;
-        if (max != null && n > max) return max;
-        return n;
-    }
-
-    static getAIMaxTokens() {
-        return QmlPlayground._getNumberSetting(
-            'qmlplayground-ai-max-tokens', AI_DEFAULTS.maxTokens, { min: 64, max: 8192 });
-    }
-
-    static getAITemperature() {
-        return QmlPlayground._getNumberSetting(
-            'qmlplayground-ai-temperature', AI_DEFAULTS.temperature, { min: 0, max: 2 });
-    }
-
-    static getAIMaxAttempts() {
-        return QmlPlayground._getNumberSetting(
-            'qmlplayground-ai-max-attempts', AI_DEFAULTS.maxAttempts, { min: 1, max: 10 });
     }
 
     static _resolveTheme(theme) {
@@ -169,18 +86,16 @@ class QmlPlayground extends EventTarget {
         this.editor = null;
         this.project = new QmlProject({ entry: 'Main.qml' });
         this.activePath = this.project.entry; // file currently shown in the editor
-        const activeModelId = QmlPlayground.getAIModel();
-        const activeProvider = QmlPlayground._providerForModelId(activeModelId);
+        const activeModelId = getAIModel();
+        const activeProvider = providerForModelId(activeModelId);
         this.ai = new QmlAI({
             provider: activeProvider,
             modelId: activeProvider === 'webllm' ? activeModelId : QMLAI_DEFAULT_MODEL,
-            openrouterKey: QmlPlayground.getAIOpenRouterKey(),
+            openrouterKey: getAIOpenRouterKey(),
             openrouterModel: activeProvider === 'openrouter' ? activeModelId : OPENROUTER_DEFAULT_MODEL,
-            systemPrompt: QmlPlayground.getAISystemPrompt(),
+            systemPrompt: getAISystemPrompt(),
         });
-        this._aiLog = []; // { ts, type: 'prompt'|'response'|'errors'|'info', text }
-        this._aiAttempts = []; // { idx, label, qml, status: 'pending'|'ok'|'fail' }
-        this._aiActiveAttempt = -1;
+        this.aiUI = null; // constructed in _buildDOM after the host DOM exists
         this._autoRunTimeout = null;
         this._examples = [];
 
@@ -764,503 +679,9 @@ class QmlPlayground extends EventTarget {
                 width: 100%;
             }
 
-            /* AI mode */
-            .btn-ai {
-                background: linear-gradient(135deg, #9aa0ff 0%, #5f73ff 100%) !important;
-                color: white;
-            }
-
-            .btn-ai.hidden {
-                display: none;
-            }
-
-            .ai-panel {
-                background: var(--bg-secondary);
-                border-bottom: 1px solid var(--border);
-                padding: 8px 10px;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-                flex-shrink: 0;
-            }
-
-            .ai-panel.hidden {
-                display: none;
-            }
-
-            .ai-panel-row {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .ai-model {
-                flex: 1;
-                background: var(--bg-tertiary);
-                color: var(--text-primary);
-                border: 1px solid var(--border);
-                border-radius: 4px;
-                padding: 6px 8px;
-                font-size: 12px;
-                font-family: inherit;
-            }
-
-            .ai-prompt {
-                background: var(--bg-tertiary);
-                color: var(--text-primary);
-                border: 1px solid var(--border);
-                border-radius: 4px;
-                padding: 8px 10px;
-                font-size: 13px;
-                font-family: inherit;
-                line-height: 1.4;
-                resize: vertical;
-                min-height: 56px;
-            }
-
-            .ai-prompt:focus {
-                outline: none;
-                border-color: var(--accent);
-            }
-
-            .ai-status {
-                flex: 1;
-                font-size: 12px;
-                color: var(--text-secondary);
-                min-height: 16px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
-
-            .btn-ai-suggestions,
-            .btn-ai-systemprompt,
-            .btn-ai-params,
-            .btn-ai-log {
-                padding: 6px 10px !important;
-                background: var(--bg-tertiary) !important;
-                color: var(--text-primary);
-                border: 1px solid var(--border);
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 12px;
-                font-weight: 400;
-            }
-
-            .btn-ai-suggestions:hover,
-            .btn-ai-systemprompt:hover,
-            .btn-ai-params:hover,
-            .btn-ai-log:hover {
-                border-color: var(--accent);
-            }
-
-            .btn-ai-generate {
-                padding: 6px 14px;
-                background: var(--accent);
-                color: white;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 13px;
-                font-weight: 500;
-            }
-
-            .btn-ai-generate:hover {
-                background: var(--accent-hover);
-            }
-
-            .btn-ai-generate.hidden {
-                display: none;
-            }
-
-            .btn-ai-cancel {
-                padding: 6px 14px;
-                background: var(--error);
-                color: white;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 13px;
-                font-weight: 500;
-            }
-
-            .btn-ai-cancel.hidden {
-                display: none;
-            }
-
-            .btn-ai-cancel:hover {
-                filter: brightness(1.1);
-            }
-
-            .ai-progress {
-                height: 4px;
-                background: var(--bg-tertiary);
-                border-radius: 2px;
-                overflow: hidden;
-            }
-
-            .ai-progress.hidden {
-                display: none;
-            }
-
-            .ai-progress-bar {
-                height: 100%;
-                width: 0;
-                background: var(--accent);
-                transition: width 0.15s linear;
-            }
-
-            .ai-tabs {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 2px;
-                padding: 4px 8px;
-                background: var(--bg-secondary);
-                border-bottom: 1px solid var(--border);
-                flex-shrink: 0;
-            }
-
-            .ai-tabs.hidden {
-                display: none;
-            }
-
-            .ai-tab {
-                padding: 4px 10px;
-                background: var(--bg-tertiary) !important;
-                color: var(--text-primary);
-                border: 1px solid var(--border);
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 12px;
-                white-space: nowrap;
-            }
-
-            .ai-tab:hover {
-                border-color: var(--accent);
-            }
-
-            .ai-tab.active {
-                background: var(--accent) !important;
-                color: white;
-                border-color: var(--accent);
-            }
-
-            .ai-tab.ai-tab-pending {
-                font-style: italic;
-            }
-
-            .ai-tab.ai-tab-ok      { color: #4caf50; }
-            .ai-tab.ai-tab-fail    { color: var(--error); }
-            .ai-tab.active.ai-tab-ok,
-            .ai-tab.active.ai-tab-fail { color: white; }
-
-            /* Suggestions popover */
-            .ai-suggestions-overlay {
-                position: absolute;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background: rgba(0, 0, 0, 0.5);
-                z-index: 200;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .ai-suggestions-overlay.hidden {
-                display: none;
-            }
-
-            .ai-suggestions-dialog {
-                background: var(--bg-secondary);
-                border: 1px solid var(--border);
-                border-radius: 8px;
-                width: 440px;
-                max-width: 90vw;
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-            }
-
-            .ai-suggestions-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 12px 16px;
-                border-bottom: 1px solid var(--border);
-                font-size: 14px;
-                font-weight: 500;
-            }
-
-            .ai-suggestions-header button {
-                background: none !important;
-                color: var(--text-secondary);
-                font-size: 20px;
-                padding: 0 4px !important;
-            }
-
-            .ai-samples {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-                padding: 12px 16px;
-            }
-
-            .ai-samples button {
-                background: var(--bg-tertiary) !important;
-                color: var(--text-primary);
-                border: 1px solid var(--border);
-                border-radius: 4px;
-                padding: 8px 12px;
-                font-size: 13px;
-                text-align: left;
-                cursor: pointer;
-            }
-
-            .ai-samples button:hover {
-                border-color: var(--accent);
-            }
-
-            /* System-prompt + Loop-log + Params dialogs */
-            .ai-systemprompt-overlay,
-            .ai-log-overlay,
-            .ai-params-overlay {
-                position: absolute;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background: rgba(0, 0, 0, 0.5);
-                z-index: 200;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .ai-systemprompt-overlay.hidden,
-            .ai-log-overlay.hidden,
-            .ai-params-overlay.hidden {
-                display: none;
-            }
-
-            .ai-systemprompt-dialog,
-            .ai-log-dialog,
-            .ai-params-dialog {
-                background: var(--bg-secondary);
-                border: 1px solid var(--border);
-                border-radius: 8px;
-                width: 720px;
-                max-width: 92vw;
-                max-height: 80vh;
-                display: flex;
-                flex-direction: column;
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-            }
-
-            .ai-params-dialog { width: 520px; }
-
-            .ai-systemprompt-header,
-            .ai-log-header,
-            .ai-params-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 12px 16px;
-                border-bottom: 1px solid var(--border);
-                font-size: 14px;
-                font-weight: 500;
-                gap: 8px;
-            }
-
-            .ai-systemprompt-header span,
-            .ai-log-header span,
-            .ai-params-header span {
-                flex: 1;
-            }
-
-            .ai-systemprompt-header button,
-            .ai-log-header button,
-            .ai-params-header button {
-                background: var(--bg-tertiary) !important;
-                color: var(--text-primary);
-                padding: 4px 8px !important;
-                font-size: 12px;
-            }
-
-            .btn-ai-systemprompt-close,
-            .btn-ai-log-close,
-            .btn-ai-params-close {
-                background: none !important;
-                color: var(--text-secondary) !important;
-                font-size: 20px !important;
-                padding: 0 4px !important;
-            }
-
-            .ai-params-body {
-                padding: 12px 16px;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-            }
-
-            .ai-params-info {
-                font-size: 12px;
-                color: var(--text-secondary);
-                padding-bottom: 4px;
-                border-bottom: 1px solid var(--border);
-                margin-bottom: 4px;
-            }
-
-            .ai-params-row-input {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                font-size: 13px;
-            }
-
-            .ai-params-row-input span {
-                flex: 1;
-            }
-
-            .ai-params-row-input input {
-                width: 100px;
-                background: var(--bg-tertiary);
-                color: var(--text-primary);
-                border: 1px solid var(--border);
-                border-radius: 4px;
-                padding: 6px 8px;
-                font-size: 13px;
-                font-family: inherit;
-            }
-
-            .ai-params-hint {
-                font-size: 11px;
-                color: var(--text-secondary);
-                margin: 0 0 4px;
-            }
-
-            .ai-params-row {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-top: 4px;
-            }
-
-            .btn-ai-params-save,
-            .btn-ai-params-reset {
-                padding: 6px 12px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 12px;
-            }
-
-            .btn-ai-params-save {
-                background: var(--accent);
-                color: white;
-                border: none;
-            }
-
-            .btn-ai-params-save:hover {
-                background: var(--accent-hover);
-            }
-
-            .btn-ai-params-reset {
-                background: var(--bg-tertiary);
-                color: var(--text-primary);
-                border: 1px solid var(--border);
-            }
-
-            .ai-systemprompt-body {
-                padding: 12px 16px;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-                overflow: auto;
-            }
-
-            .ai-systemprompt-text {
-                background: var(--bg-tertiary);
-                color: var(--text-primary);
-                border: 1px solid var(--border);
-                border-radius: 4px;
-                padding: 10px 12px;
-                font-size: 12px;
-                font-family: 'Fira Code', monospace;
-                line-height: 1.5;
-                resize: vertical;
-                min-height: 280px;
-            }
-
-            .ai-systemprompt-row {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .ai-systemprompt-hint {
-                flex: 1;
-                font-size: 11px;
-                color: var(--text-secondary);
-            }
-
-            .btn-ai-systemprompt-save,
-            .btn-ai-systemprompt-reset {
-                padding: 6px 12px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 12px;
-            }
-
-            .btn-ai-systemprompt-save {
-                background: var(--accent);
-                color: white;
-                border: none;
-            }
-
-            .btn-ai-systemprompt-save:hover {
-                background: var(--accent-hover);
-            }
-
-            .btn-ai-systemprompt-reset {
-                background: var(--bg-tertiary);
-                color: var(--text-primary);
-                border: 1px solid var(--border);
-            }
-
-            .ai-log-body {
-                padding: 8px 16px;
-                overflow: auto;
-                font-family: 'Fira Code', monospace;
-                font-size: 12px;
-                line-height: 1.45;
-                flex: 1;
-            }
-
-            .ai-log-entry {
-                margin: 8px 0;
-                border-left: 3px solid var(--border);
-                padding-left: 10px;
-            }
-
-            .ai-log-entry.ai-log-prompt    { border-color: #5f73ff; }
-            .ai-log-entry.ai-log-directive { border-color: #cca700; }
-            .ai-log-entry.ai-log-response  { border-color: #4caf50; }
-            .ai-log-entry.ai-log-errors    { border-color: var(--error); }
-            .ai-log-entry.ai-log-info      { border-color: var(--text-secondary); }
-
-            .ai-log-meta {
-                color: var(--text-secondary);
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                margin-bottom: 2px;
-            }
-
-            .ai-log-text {
-                white-space: pre-wrap;
-                word-break: break-word;
-            }
 
             .btn-apply-logging:hover {
                 background: var(--accent-hover);
-            }
-
-            .settings-ai-providers.hidden,
-            .settings-ai-openrouter-key-row.hidden {
-                display: none;
             }
 
             .settings-ai-key-label {
@@ -1305,7 +726,6 @@ class QmlPlayground extends EventTarget {
                         <input type="checkbox" class="auto-run-checkbox" checked>
                         Auto
                     </label>
-                    <button class="btn-ai hidden" title="Generate a QML project from a prompt">AI mode</button>
                 </div>
                 <div class="toolbar-title">QML Playground</div>
                 <div class="toolbar-right">
@@ -1377,109 +797,10 @@ class QmlPlayground extends EventTarget {
                 </div>
             </div>
 
-            <div class="ai-suggestions-overlay hidden">
-                <div class="ai-suggestions-dialog">
-                    <div class="ai-suggestions-header">
-                        <span>Suggestions</span>
-                        <button class="btn-ai-suggestions-close">&times;</button>
-                    </div>
-                    <div class="ai-samples"></div>
-                </div>
-            </div>
-
-            <div class="ai-systemprompt-overlay hidden">
-                <div class="ai-systemprompt-dialog">
-                    <div class="ai-systemprompt-header">
-                        <span>System prompt</span>
-                        <button class="btn-ai-systemprompt-close">&times;</button>
-                    </div>
-                    <div class="ai-systemprompt-body">
-                        <textarea class="ai-systemprompt-text" rows="14"></textarea>
-                        <div class="ai-systemprompt-row">
-                            <button class="btn-ai-systemprompt-reset" type="button">Reset to default</button>
-                            <span class="ai-systemprompt-hint">Saved to localStorage; applies on next Generate.</span>
-                            <button class="btn-ai-systemprompt-save" type="button">Save</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="ai-log-overlay hidden">
-                <div class="ai-log-dialog">
-                    <div class="ai-log-header">
-                        <span>Loop log</span>
-                        <button class="btn-ai-log-clear" type="button" title="Clear">Clear</button>
-                        <button class="btn-ai-log-close">&times;</button>
-                    </div>
-                    <div class="ai-log-body"></div>
-                </div>
-            </div>
-
-            <div class="ai-params-overlay hidden">
-                <div class="ai-params-dialog">
-                    <div class="ai-params-header">
-                        <span>Model parameters</span>
-                        <button class="btn-ai-params-close">&times;</button>
-                    </div>
-                    <div class="ai-params-body">
-                        <div class="ai-params-info"></div>
-
-                        <label class="ai-params-row-input">
-                            <span>Max tokens (response cap)</span>
-                            <input class="ai-params-maxtokens" type="number" min="64" max="8192" step="64">
-                        </label>
-                        <div class="ai-params-hint">
-                            Total tokens (prompt + response) must fit in the model's context window.
-                            If output is truncated, try lowering this or pick a model with more context.
-                        </div>
-
-                        <label class="ai-params-row-input">
-                            <span>Temperature (0.0 – 2.0)</span>
-                            <input class="ai-params-temperature" type="number" min="0" max="2" step="0.05">
-                        </label>
-                        <div class="ai-params-hint">
-                            Lower = more deterministic. Each retry attempt bumps this by +0.2 (capped at 0.8).
-                        </div>
-
-                        <label class="ai-params-row-input">
-                            <span>Max fix attempts</span>
-                            <input class="ai-params-maxattempts" type="number" min="1" max="10" step="1">
-                        </label>
-                        <div class="ai-params-hint">
-                            Total attempts before giving up (initial + retries on errors).
-                        </div>
-
-                        <div class="ai-params-row">
-                            <button class="btn-ai-params-reset" type="button">Reset to defaults</button>
-                            <span class="ai-params-hint" style="flex:1">Changes apply immediately on next Generate.</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <div class="main-container">
                 <div class="file-tree hidden"></div>
                 <div class="editor-pane">
-                    <div class="ai-panel hidden">
-                        <div class="ai-panel-row">
-                            <select class="ai-model"></select>
-                        </div>
-                        <textarea class="ai-prompt" rows="3"
-                            placeholder="Describe a QML scene — e.g. A button that fades to a different color when hovered"></textarea>
-                        <div class="ai-panel-row">
-                            <button class="btn-ai-suggestions" type="button">Suggestions</button>
-                            <button class="btn-ai-systemprompt" type="button" title="View / edit system prompt">System prompt</button>
-                            <button class="btn-ai-params" type="button" title="Generation parameters (max_tokens, temperature, max attempts)">Params</button>
-                            <button class="btn-ai-log" type="button" title="Loop log">Loop log</button>
-                            <span class="ai-status"></span>
-                            <button class="btn-ai-generate" type="button">Generate</button>
-                            <button class="btn-ai-cancel hidden" type="button">Cancel</button>
-                        </div>
-                        <div class="ai-progress hidden">
-                            <div class="ai-progress-bar"></div>
-                        </div>
-                    </div>
-                    <div class="ai-tabs hidden"></div>
                     <textarea class="editor-textarea"></textarea>
                 </div>
                 <div class="resizer"></div>
@@ -1531,39 +852,7 @@ class QmlPlayground extends EventTarget {
         this.loggingRulesElement = this.shadow.querySelector('.settings-logging-rules');
         this.loggingCheckboxes = this.shadow.querySelectorAll('.settings-checkboxes input[type="checkbox"][data-rule]');
         this.applyLoggingElement = this.shadow.querySelector('.btn-apply-logging');
-        this.aiButtonElement = this.shadow.querySelector('.btn-ai');
-        this.aiPanelElement = this.shadow.querySelector('.ai-panel');
-        this.aiTabsElement = this.shadow.querySelector('.ai-tabs');
-        this.aiModelElement = this.shadow.querySelector('.ai-model');
-        this.aiPromptElement = this.shadow.querySelector('.ai-prompt');
-        this.aiSamplesElement = this.shadow.querySelector('.ai-samples');
-        this.aiStatusElement = this.shadow.querySelector('.ai-status');
-        this.aiProgressElement = this.shadow.querySelector('.ai-progress');
-        this.aiProgressBarElement = this.shadow.querySelector('.ai-progress-bar');
-        this.aiGenerateElement = this.shadow.querySelector('.btn-ai-generate');
-        this.aiCancelElement = this.shadow.querySelector('.btn-ai-cancel');
-        this.aiSuggestionsButtonElement = this.shadow.querySelector('.btn-ai-suggestions');
-        this.aiSuggestionsOverlayElement = this.shadow.querySelector('.ai-suggestions-overlay');
-        this.aiSuggestionsCloseElement = this.shadow.querySelector('.btn-ai-suggestions-close');
-        this.aiSystemPromptButtonElement = this.shadow.querySelector('.btn-ai-systemprompt');
-        this.aiSystemPromptOverlayElement = this.shadow.querySelector('.ai-systemprompt-overlay');
-        this.aiSystemPromptCloseElement = this.shadow.querySelector('.btn-ai-systemprompt-close');
-        this.aiSystemPromptTextElement = this.shadow.querySelector('.ai-systemprompt-text');
-        this.aiSystemPromptSaveElement = this.shadow.querySelector('.btn-ai-systemprompt-save');
-        this.aiSystemPromptResetElement = this.shadow.querySelector('.btn-ai-systemprompt-reset');
-        this.aiLogButtonElement = this.shadow.querySelector('.btn-ai-log');
-        this.aiLogOverlayElement = this.shadow.querySelector('.ai-log-overlay');
-        this.aiLogCloseElement = this.shadow.querySelector('.btn-ai-log-close');
-        this.aiLogClearElement = this.shadow.querySelector('.btn-ai-log-clear');
-        this.aiLogBodyElement = this.shadow.querySelector('.ai-log-body');
-        this.aiParamsButtonElement = this.shadow.querySelector('.btn-ai-params');
-        this.aiParamsOverlayElement = this.shadow.querySelector('.ai-params-overlay');
-        this.aiParamsCloseElement = this.shadow.querySelector('.btn-ai-params-close');
-        this.aiParamsInfoElement = this.shadow.querySelector('.ai-params-info');
-        this.aiParamsMaxTokensElement = this.shadow.querySelector('.ai-params-maxtokens');
-        this.aiParamsTemperatureElement = this.shadow.querySelector('.ai-params-temperature');
-        this.aiParamsMaxAttemptsElement = this.shadow.querySelector('.ai-params-maxattempts');
-        this.aiParamsResetElement = this.shadow.querySelector('.btn-ai-params-reset');
+        // (AI elements are queried by QmlAIUI after it mounts.)
     }
 
     // Initialize the playground
@@ -1571,10 +860,56 @@ class QmlPlayground extends EventTarget {
         await this._initEditor();
         this._initUI();
         this._initResizer();
+        this._mountAIUI();
         await this._initRuntime();
         await this.loadExamples();
         await this.loadExample('hello.qml');
         return this;
+    }
+
+    _mountAIUI() {
+        this.aiUI = new QmlAIUI(this.shadow, {
+            ai: this.ai,
+            editor: this.editor,
+            replaceProject: (jsonObj) => this._loadProjectObject(jsonObj),
+            setEditorContent: (text) => this._setValue(text),
+            syncProjectFromEditor: () => {
+                this.project.setFileContent(this.activePath, this.editor?.getValue() ?? '');
+            },
+            runQml: (qml) => this._runAndAwaitErrorsForQml(qml),
+            log: (msg, type) => this.log(msg, type),
+        });
+        this.aiUI.mount();
+    }
+
+    // Run an arbitrary QML string in the runtime (without touching
+    // this.project) and resolve with the resulting error list. Used by
+    // the AI fix-loop to evaluate each attempt's output.
+    _runAndAwaitErrorsForQml(qml) {
+        return new Promise((resolve) => {
+            const handler = () => {
+                this.runtime.removeEventListener('qmlloaded', handler);
+                const issues = this.runtime.getErrors() || [];
+                resolve(issues.filter(i => i.type === 'error' || !i.type));
+            };
+            this.runtime.addEventListener('qmlloaded', handler);
+
+            const tempProject = new QmlProject({
+                entry: 'Main.qml',
+                files: [{ path: 'Main.qml', content: qml }],
+            });
+            this._clearErrors();
+            this._setStatus('running');
+            this._emit('running');
+            this._runInFlight = true;
+            try {
+                this.runtime.loadProject(tempProject);
+            } catch (e) {
+                this._showIssue({ line: 0, column: 0, message: e.message, type: 'error' });
+                this.runtime.removeEventListener('qmlloaded', handler);
+                resolve([{ line: 0, column: 0, message: e.message }]);
+            }
+        });
     }
 
     async _initEditor() {
@@ -1676,30 +1011,30 @@ class QmlPlayground extends EventTarget {
             // AI provider toggles + OpenRouter key. Each option applies
             // immediately; the dialog stays open. The key input is
             // always visible but disabled until OpenRouter is checked.
+            // QmlAIUI owns the AI button + panel; we just tell it to
+            // refresh after a toggle.
             const syncAISubrows = () => {
                 const orOn = !!this.aiOpenRouterEnabledElement?.checked;
                 if (this.aiOpenRouterKeyElement)
                     this.aiOpenRouterKeyElement.disabled = !orOn;
             };
             if (this.aiLocalEnabledElement) {
-                this.aiLocalEnabledElement.checked = QmlPlayground.getAILocalEnabled();
+                this.aiLocalEnabledElement.checked = getAILocalEnabled();
                 this.aiLocalEnabledElement.addEventListener('change', (e) => {
                     localStorage.setItem('qmlplayground-ai-local-enabled', e.target.checked);
-                    this._populateAIModelSelect();
-                    this._applyAIVisibility();
+                    this.aiUI?.refresh();
                 });
             }
             if (this.aiOpenRouterEnabledElement) {
-                this.aiOpenRouterEnabledElement.checked = QmlPlayground.getAIOpenRouterEnabled();
+                this.aiOpenRouterEnabledElement.checked = getAIOpenRouterEnabled();
                 this.aiOpenRouterEnabledElement.addEventListener('change', (e) => {
                     localStorage.setItem('qmlplayground-ai-openrouter-enabled', e.target.checked);
-                    this._populateAIModelSelect();
-                    this._applyAIVisibility();
+                    this.aiUI?.refresh();
                     syncAISubrows();
                 });
             }
             if (this.aiOpenRouterKeyElement) {
-                this.aiOpenRouterKeyElement.value = QmlPlayground.getAIOpenRouterKey();
+                this.aiOpenRouterKeyElement.value = getAIOpenRouterKey();
                 this.aiOpenRouterKeyElement.addEventListener('input', (e) => {
                     const k = e.target.value;
                     if (k) localStorage.setItem('qmlplayground-ai-openrouter-key', k);
@@ -1707,9 +1042,7 @@ class QmlPlayground extends EventTarget {
                     this.ai.setOpenRouterKey(k);
                 });
             }
-            this._applyAIVisibility();
             syncAISubrows();
-            this._initAIDialog();
 
             // Logging rules
             const savedRules = localStorage.getItem('qmlplayground-logging-rules') || '';
@@ -2081,543 +1414,6 @@ class QmlPlayground extends EventTarget {
 
     // ---- AI mode ----
 
-    _applyAIVisibility() {
-        const enabled = QmlPlayground.getAIEnabled();
-        this.aiButtonElement?.classList.toggle('hidden', !enabled);
-        if (!enabled && this.aiPanelElement)
-            this.aiPanelElement.classList.add('hidden');
-    }
-
-    _initAIDialog() {
-        if (!this.aiButtonElement || !this.aiPanelElement) return;
-
-        // Populate model selector (optgroup'd by provider).
-        if (this.aiModelElement) {
-            this._populateAIModelSelect();
-            this.aiModelElement.addEventListener('change', (e) => {
-                this._applySelectedAIModel(e.target.value);
-                const prov = QmlPlayground._providerForModelId(e.target.value);
-                if (prov === 'webllm')
-                    this._setAIStatus('Model will load on next Generate.');
-                else
-                    this._setAIStatus('');
-            });
-        }
-
-        // Populate sample prompts (in the Suggestions popover)
-        if (this.aiSamplesElement) {
-            this.aiSamplesElement.innerHTML = '';
-            for (const sample of AI_SAMPLE_PROMPTS) {
-                const btn = document.createElement('button');
-                btn.textContent = sample;
-                btn.addEventListener('click', () => {
-                    if (this.aiPromptElement) {
-                        this.aiPromptElement.value = sample;
-                        this.aiPromptElement.focus();
-                    }
-                    this._closeSuggestions();
-                });
-                this.aiSamplesElement.appendChild(btn);
-            }
-        }
-
-        // Toolbar AI button toggles the inline panel
-        this.aiButtonElement.addEventListener('click', () => {
-            const hidden = this.aiPanelElement.classList.toggle('hidden');
-            if (!hidden) {
-                this.aiPromptElement?.focus();
-                this.editor?.refresh();
-            }
-        });
-
-        // Suggestions popover open/close
-        this.aiSuggestionsButtonElement?.addEventListener('click', () => {
-            this.aiSuggestionsOverlayElement?.classList.remove('hidden');
-        });
-        this.aiSuggestionsCloseElement?.addEventListener('click', () => this._closeSuggestions());
-        this.aiSuggestionsOverlayElement?.addEventListener('click', (e) => {
-            if (e.target === this.aiSuggestionsOverlayElement) this._closeSuggestions();
-        });
-
-        // System prompt dialog
-        this.aiSystemPromptButtonElement?.addEventListener('click', () => {
-            if (this.aiSystemPromptTextElement)
-                this.aiSystemPromptTextElement.value = this.ai.getSystemPrompt();
-            this.aiSystemPromptOverlayElement?.classList.remove('hidden');
-        });
-        const closeSysPrompt = () => this.aiSystemPromptOverlayElement?.classList.add('hidden');
-        this.aiSystemPromptCloseElement?.addEventListener('click', closeSysPrompt);
-        this.aiSystemPromptOverlayElement?.addEventListener('click', (e) => {
-            if (e.target === this.aiSystemPromptOverlayElement) closeSysPrompt();
-        });
-        this.aiSystemPromptSaveElement?.addEventListener('click', () => {
-            const text = this.aiSystemPromptTextElement?.value ?? '';
-            this.ai.setSystemPrompt(text);
-            localStorage.setItem('qmlplayground-ai-system-prompt', text);
-            closeSysPrompt();
-        });
-        this.aiSystemPromptResetElement?.addEventListener('click', () => {
-            if (this.aiSystemPromptTextElement)
-                this.aiSystemPromptTextElement.value = DEFAULT_SYSTEM_PROMPT;
-            this.ai.setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
-            localStorage.removeItem('qmlplayground-ai-system-prompt');
-        });
-
-        // Params dialog
-        this.aiParamsButtonElement?.addEventListener('click', () => {
-            this._populateAIParams();
-            this.aiParamsOverlayElement?.classList.remove('hidden');
-        });
-        const closeParams = () => this.aiParamsOverlayElement?.classList.add('hidden');
-        this.aiParamsCloseElement?.addEventListener('click', closeParams);
-        this.aiParamsOverlayElement?.addEventListener('click', (e) => {
-            if (e.target === this.aiParamsOverlayElement) closeParams();
-        });
-        // Apply each Params field immediately on change.
-        const persistNumber = (el, key) => {
-            if (!el) return;
-            el.addEventListener('input', () => {
-                const n = Number(el.value);
-                if (Number.isFinite(n)) localStorage.setItem(key, String(n));
-            });
-        };
-        persistNumber(this.aiParamsMaxTokensElement,   'qmlplayground-ai-max-tokens');
-        persistNumber(this.aiParamsTemperatureElement, 'qmlplayground-ai-temperature');
-        persistNumber(this.aiParamsMaxAttemptsElement, 'qmlplayground-ai-max-attempts');
-
-        this.aiParamsResetElement?.addEventListener('click', () => {
-            localStorage.removeItem('qmlplayground-ai-max-tokens');
-            localStorage.removeItem('qmlplayground-ai-temperature');
-            localStorage.removeItem('qmlplayground-ai-max-attempts');
-            this._populateAIParams();
-        });
-
-        // Loop log dialog
-        this.aiLogButtonElement?.addEventListener('click', () => {
-            this._renderAILog();
-            this.aiLogOverlayElement?.classList.remove('hidden');
-        });
-        const closeLog = () => this.aiLogOverlayElement?.classList.add('hidden');
-        this.aiLogCloseElement?.addEventListener('click', closeLog);
-        this.aiLogOverlayElement?.addEventListener('click', (e) => {
-            if (e.target === this.aiLogOverlayElement) closeLog();
-        });
-        this.aiLogClearElement?.addEventListener('click', () => {
-            this._aiLog = [];
-            this._renderAILog();
-        });
-
-        this.aiGenerateElement?.addEventListener('click', () => this._aiGenerateAndFix());
-        this.aiCancelElement?.addEventListener('click', () => {
-            this._aiCanceled = true;
-            this.ai.interrupt();
-            this._appendAILog('info', 'Canceled by user.');
-            this._setAIStatus('Canceling…');
-        });
-    }
-
-    _aiSetBusy(busy) {
-        this.aiGenerateElement?.classList.toggle('hidden', busy);
-        this.aiCancelElement?.classList.toggle('hidden', !busy);
-    }
-
-    // Append a log entry and (if the dialog is open) re-render.
-    _appendAILog(type, text) {
-        this._aiLog.push({ ts: Date.now(), type, text });
-        if (this.aiLogOverlayElement && !this.aiLogOverlayElement.classList.contains('hidden'))
-            this._renderAILog();
-    }
-
-    // Populate the panel's model dropdown with provider-scoped
-    // optgroups. Each enabled provider contributes its curated list;
-    // disabled providers are omitted entirely. Selecting an option
-    // derives the provider from which list the id belongs to.
-    _populateAIModelSelect() {
-        if (!this.aiModelElement) return;
-        const localOn = QmlPlayground.getAILocalEnabled();
-        const orOn    = QmlPlayground.getAIOpenRouterEnabled();
-        const saved   = QmlPlayground.getAIModel();
-
-        this.aiModelElement.innerHTML = '';
-
-        const addGroup = (label, models) => {
-            const group = document.createElement('optgroup');
-            group.label = label;
-            for (const m of models) {
-                const opt = document.createElement('option');
-                opt.value = m.id;
-                opt.textContent = m.label;
-                group.appendChild(opt);
-            }
-            this.aiModelElement.appendChild(group);
-        };
-
-        if (localOn) addGroup('Local (WebLLM)', QMLAI_MODELS);
-        if (orOn) {
-            const open    = OPENROUTER_MODELS.filter(m => m.group === 'open');
-            const frontier = OPENROUTER_MODELS.filter(m => m.group === 'frontier');
-            if (open.length)     addGroup('OpenRouter — open weights', open);
-            if (frontier.length) addGroup('OpenRouter — frontier',     frontier);
-        }
-
-        // Pick a sensible selection: saved id if still available, else
-        // first option, else nothing (means neither provider is on).
-        const allIds = [
-            ...(localOn ? QMLAI_MODELS.map(m => m.id) : []),
-            ...(orOn ? OPENROUTER_MODELS.map(m => m.id) : []),
-        ];
-        let target = allIds.includes(saved) ? saved : allIds[0];
-        if (target) {
-            this.aiModelElement.value = target;
-            this._applySelectedAIModel(target);
-        } else {
-            // Neither provider enabled — leave empty.
-            this.ai.setProvider('webllm');
-        }
-    }
-
-    _applySelectedAIModel(id) {
-        const provider = QmlPlayground._providerForModelId(id);
-        this.ai.setProvider(provider);
-        if (provider === 'openrouter') this.ai.setOpenRouterModel(id);
-        else this.ai.setModel(id);
-        localStorage.setItem('qmlplayground-ai-model', id);
-    }
-
-    _populateAIParams() {
-        if (this.aiParamsInfoElement) {
-            const id = this.ai.activeModelId();
-            const provider = QmlPlayground._providerForModelId(id);
-            const list = provider === 'openrouter' ? OPENROUTER_MODELS : QMLAI_MODELS;
-            const m = list.find(x => x.id === id);
-            const providerLabel = provider === 'openrouter' ? 'OpenRouter' : 'WebLLM';
-            this.aiParamsInfoElement.textContent = `${providerLabel} — ${m?.label || id}`;
-        }
-        if (this.aiParamsMaxTokensElement)
-            this.aiParamsMaxTokensElement.value = String(QmlPlayground.getAIMaxTokens());
-        if (this.aiParamsTemperatureElement)
-            this.aiParamsTemperatureElement.value = String(QmlPlayground.getAITemperature());
-        if (this.aiParamsMaxAttemptsElement)
-            this.aiParamsMaxAttemptsElement.value = String(QmlPlayground.getAIMaxAttempts());
-    }
-
-    // ---- AI attempt tabs ----
-
-    _resetAIAttempts() {
-        this._aiAttempts = [];
-        this._aiActiveAttempt = -1;
-        this._renderAITabs();
-    }
-
-    _startAIAttempt(attemptNumber) {
-        const idx = this._aiAttempts.length;
-        this._aiAttempts.push({
-            label: `Attempt ${attemptNumber}`,
-            qml: '',
-            status: 'pending',
-        });
-        // Auto-activate the FIRST attempt (so the user sees it stream
-        // in). For subsequent (fix) attempts the user stays on whatever
-        // tab they're already viewing.
-        if (this._aiActiveAttempt < 0)
-            this._aiActiveAttempt = idx;
-        this._renderAITabs();
-        return idx;
-    }
-
-    _appendToAIAttempt(idx, delta) {
-        const att = this._aiAttempts[idx];
-        if (!att) return;
-        att.qml += delta;
-        // Only mirror into the editor if the user is actually looking at
-        // this attempt's tab; otherwise the attempt streams silently in
-        // the background.
-        if (this._aiActiveAttempt === idx) {
-            this.editor?.appendValue(delta, { silent: true });
-            this.project.setFileContent(
-                this.activePath, this.editor?.getValue() ?? '');
-        }
-    }
-
-    _finishAIAttempt(idx, qml, errors) {
-        const att = this._aiAttempts[idx];
-        if (!att) return;
-        att.qml = qml;
-        att.status = errors && errors.length > 0 ? 'fail' : 'ok';
-        att.errorCount = errors?.length ?? 0;
-        // If the active tab is this one, reconcile any cleanup differences
-        // (e.g. fences stripped from the final result).
-        if (this._aiActiveAttempt === idx) {
-            const current = this.editor?.getValue() ?? '';
-            if (current !== qml) this._setValue(qml);
-            else this.project.setFileContent(this.activePath, qml);
-        }
-        this._renderAITabs();
-    }
-
-    _switchToAIAttempt(idx) {
-        const att = this._aiAttempts[idx];
-        if (!att) return;
-        if (this._aiActiveAttempt === idx) return;
-        // Save current editor content into the previously-active tab so
-        // user edits aren't lost.
-        if (this._aiActiveAttempt >= 0) {
-            const cur = this._aiAttempts[this._aiActiveAttempt];
-            if (cur) cur.qml = this.editor?.getValue() ?? cur.qml;
-        }
-        this._aiActiveAttempt = idx;
-        this._setValue(att.qml);
-        this._renderAITabs();
-        // Selecting a tab makes that attempt live.
-        if (this.runtime?.ready) this.run();
-    }
-
-    _renderAITabs() {
-        if (!this.aiTabsElement) return;
-        const visible = this._aiAttempts.length > 0;
-        this.aiTabsElement.classList.toggle('hidden', !visible);
-        this.aiTabsElement.innerHTML = '';
-        if (!visible) return;
-        this._aiAttempts.forEach((att, i) => {
-            const tab = document.createElement('button');
-            tab.className = 'ai-tab';
-            tab.classList.add(`ai-tab-${att.status}`);
-            if (i === this._aiActiveAttempt) tab.classList.add('active');
-            const mark = att.status === 'ok'   ? ' ✓'
-                       : att.truncated         ? ' …'
-                       : att.status === 'fail' ? ` ✗${att.errorCount > 1 ? '×' + att.errorCount : ''}`
-                       : '';
-            tab.textContent = att.label + mark;
-            if (att.truncated) tab.title = (tab.title ? tab.title + '\n' : '') + 'Output truncated (max_tokens)';
-            tab.addEventListener('click', () => this._switchToAIAttempt(i));
-            this.aiTabsElement.appendChild(tab);
-        });
-    }
-
-    _renderAILog() {
-        if (!this.aiLogBodyElement) return;
-        this.aiLogBodyElement.innerHTML = '';
-        if (this._aiLog.length === 0) {
-            this.aiLogBodyElement.textContent = '(empty)';
-            return;
-        }
-        for (const entry of this._aiLog) {
-            const wrap = document.createElement('div');
-            wrap.className = `ai-log-entry ai-log-${entry.type}`;
-            const meta = document.createElement('div');
-            meta.className = 'ai-log-meta';
-            const t = new Date(entry.ts);
-            meta.textContent = `${t.toLocaleTimeString()}  •  ${entry.type}`;
-            const txt = document.createElement('div');
-            txt.className = 'ai-log-text';
-            txt.textContent = entry.text;
-            wrap.appendChild(meta);
-            wrap.appendChild(txt);
-            this.aiLogBodyElement.appendChild(wrap);
-        }
-        // Scroll to bottom
-        this.aiLogBodyElement.scrollTop = this.aiLogBodyElement.scrollHeight;
-    }
-
-    // Orchestrate: stream tokens into the editor, run, check errors,
-    // ask the model to emit a fix, run, repeat up to the configured max attempts.
-    async _aiGenerateAndFix() {
-        const prompt = this.aiPromptElement?.value.trim() || '';
-        if (!prompt) {
-            this._setAIStatus('Enter a prompt first.');
-            return;
-        }
-        if (!await hasWebGPU()) {
-            this._setAIStatus('WebGPU is not available in this browser.');
-            return;
-        }
-
-        this._aiCanceled = false;
-        this._aiSetBusy(true);
-        this._setAIProgress(null, 'Preparing…');
-
-        // Reset to a fresh empty project so streaming has a single file to
-        // write into.
-        this._loadProjectObject({
-            $schema: 'qmlplayground/project/v1',
-            name: 'AI: ' + prompt.slice(0, 60),
-            entry: 'Main.qml',
-            files: [{ path: 'Main.qml', encoding: 'utf-8', content: '' }],
-        });
-
-        this._appendAILog('prompt', prompt);
-        this._resetAIAttempts();
-        this.ai.startSession(prompt);
-        this._appendAILog('directive', `[system prompt]\n${this.ai.getSystemPrompt()}`);
-
-        try {
-            const ok = await this._aiRunSessionLoop(1);
-            if (this._aiCanceled)
-                this._setAIProgress(null, 'Canceled.');
-            else
-                this._setAIProgress(null, ok ? 'Done' : 'Done (with unresolved errors)');
-        } catch (e) {
-            this._setAIProgress(null, 'Error: ' + e.message);
-            this._appendAILog('errors', e.message);
-            this.log(`AI generate error: ${e.message}`, 'error');
-        } finally {
-            this._aiSetBusy(false);
-        }
-    }
-
-    async _aiRunSessionLoop(attempt) {
-        if (this._aiCanceled) return false;
-
-        const isFix = attempt > 1;
-        const maxAttempts = QmlPlayground.getAIMaxAttempts();
-        this._setAIStatus(
-            isFix ? `Fixing errors (attempt ${attempt}/${maxAttempts})…`
-                  : 'Generating…');
-
-        // Bump temperature on retries so the sampler can diverge from a
-        // stuck answer.
-        const baseTemp = QmlPlayground.getAITemperature();
-        const temperature = Math.min(baseTemp + (attempt - 1) * 0.2, 2);
-        const maxTokens = QmlPlayground.getAIMaxTokens();
-
-        // Create a tab for this attempt. For the FIRST attempt the user
-        // is moved to its tab (and the editor cleared so streaming
-        // appears live). For fix attempts, the user stays on whatever
-        // tab they're viewing — the new tab streams in the background.
-        const attemptIdx = this._startAIAttempt(attempt);
-        if (this._aiActiveAttempt === attemptIdx)
-            this._setValue('');
-
-        const { qml: result, finishReason } = await this.ai.runSession({
-            onLoadProgress: ({ progress, text }) => {
-                this._setAIProgress(progress, text);
-            },
-            onToken: (delta) => {
-                this._appendToAIAttempt(attemptIdx, delta);
-            },
-            temperature,
-            maxTokens,
-        });
-        this._setAIProgress(null, '');
-
-        if (this._aiCanceled) return false;
-
-        this._appendAILog('response', result);
-        const newQml = result;
-
-        if (finishReason === 'length') {
-            this._appendAILog('info',
-                `Attempt ${attempt}: output truncated — model hit max_tokens. ` +
-                `Try a smaller prompt or a larger model (longer context).`);
-            this._setAIStatus('Output truncated — try a smaller prompt or larger model.');
-            // Mark the tab; treat truncation as a terminal failure for
-            // this run (retrying will hit the same wall).
-            const att = this._aiAttempts[attemptIdx];
-            if (att) {
-                att.qml = newQml;
-                att.status = 'fail';
-                att.errorCount = 0;
-                att.truncated = true;
-                this._renderAITabs();
-            }
-            return false;
-        }
-
-        // Run THIS attempt's QML to evaluate it — even if the user is
-        // looking at a different tab. The runtime preview will show the
-        // attempt being checked; user can click the tab to inspect.
-        const errors = await this._runAndAwaitErrorsForQml(newQml);
-        if (this._aiCanceled) return false;
-
-        // Mark the tab with the outcome.
-        this._finishAIAttempt(attemptIdx, newQml, errors);
-
-        if (errors.length === 0) {
-            this._appendAILog('info', `Attempt ${attempt}: success, no errors.`);
-            return true;
-        }
-
-        const errorSummary = errors.map(e =>
-            `line ${e.line}, col ${e.column}: ${e.message}`).join('\n');
-        this._appendAILog('errors',
-            `Attempt ${attempt} produced ${errors.length} error(s):\n${errorSummary}`);
-
-        if (attempt >= maxAttempts) {
-            this._appendAILog('info', `Reached max attempts (${maxAttempts}); giving up.`);
-            return false;
-        }
-
-        this.ai.addFixTurn(newQml, errors);
-        const msgs = this.ai.getMessages();
-        const fixTurn = msgs[msgs.length - 1];
-        if (fixTurn?.role === 'user')
-            this._appendAILog('directive', `[fix turn ${attempt}→${attempt + 1}]\n${fixTurn.content}`);
-        return this._aiRunSessionLoop(attempt + 1);
-    }
-
-    // Run an arbitrary QML string (bypassing the editor/project mirror)
-    // and resolve with its error list. Used by the AI loop so a fix
-    // attempt can be evaluated even when the user is viewing a
-    // different tab.
-    _runAndAwaitErrorsForQml(qml) {
-        return new Promise((resolve) => {
-            const handler = () => {
-                this.runtime.removeEventListener('qmlloaded', handler);
-                const issues = this.runtime.getErrors() || [];
-                resolve(issues.filter(i => i.type === 'error' || !i.type));
-            };
-            this.runtime.addEventListener('qmlloaded', handler);
-
-            const tempProject = new QmlProject({
-                entry: 'Main.qml',
-                files: [{ path: 'Main.qml', content: qml }],
-            });
-            this._clearErrors();
-            this._setStatus('running');
-            this._emit('running');
-            this._runInFlight = true;
-            try {
-                this.runtime.loadProject(tempProject);
-            } catch (e) {
-                this._showIssue({ line: 0, column: 0, message: e.message, type: 'error' });
-                this.runtime.removeEventListener('qmlloaded', handler);
-                resolve([{ line: 0, column: 0, message: e.message }]);
-            }
-        });
-    }
-
-    // Resolve with the error list reported after the next qmlloaded.
-    _runAndAwaitErrors() {
-        return new Promise((resolve) => {
-            const handler = () => {
-                this.runtime.removeEventListener('qmlloaded', handler);
-                const issues = this.runtime.getErrors() || [];
-                resolve(issues.filter(i => i.type === 'error' || !i.type));
-            };
-            this.runtime.addEventListener('qmlloaded', handler);
-            this.run();
-        });
-    }
-
-    _setAIStatus(msg) {
-        if (this.aiStatusElement) this.aiStatusElement.textContent = msg;
-    }
-
-    _closeSuggestions() {
-        this.aiSuggestionsOverlayElement?.classList.add('hidden');
-    }
-
-    _setAIProgress(progress, text) {
-        if (this.aiStatusElement) this.aiStatusElement.textContent = text || '';
-        if (!this.aiProgressElement || !this.aiProgressBarElement) return;
-        if (progress == null) {
-            this.aiProgressElement.classList.add('hidden');
-            this.aiProgressBarElement.style.width = '0%';
-        } else {
-            this.aiProgressElement.classList.remove('hidden');
-            this.aiProgressBarElement.style.width = (progress * 100).toFixed(1) + '%';
-        }
-    }
 
     // Load a specific example by name or file. Examples can be single-file
     // (entry has "file") or multi-file projects (entry has "project" with a
