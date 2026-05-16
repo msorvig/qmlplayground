@@ -3,7 +3,15 @@
 import { QmlRuntime } from './qmlruntime.js';
 import { QmlEditor } from './qmleditor.js';
 import { QmlProject } from './qmlproject.js';
-import { QmlAI, QMLAI_MODELS, QMLAI_DEFAULT_MODEL, DEFAULT_SYSTEM_PROMPT, hasWebGPU } from './qmlai.js';
+import {
+    QmlAI,
+    QMLAI_MODELS,
+    QMLAI_DEFAULT_MODEL,
+    OPENROUTER_MODELS,
+    OPENROUTER_DEFAULT_MODEL,
+    DEFAULT_SYSTEM_PROMPT,
+    hasWebGPU,
+} from './qmlai.js';
 
 const AI_DEFAULTS = {
     maxTokens:   1024,
@@ -48,11 +56,31 @@ class QmlPlayground extends EventTarget {
     }
 
     static getAIEnabled() {
-        return localStorage.getItem('qmlplayground-ai-enabled') === 'true';
+        return QmlPlayground.getAILocalEnabled() || QmlPlayground.getAIOpenRouterEnabled();
+    }
+
+    static getAILocalEnabled() {
+        const v = localStorage.getItem('qmlplayground-ai-local-enabled');
+        return v == null ? true : v === 'true';
+    }
+
+    static getAIOpenRouterEnabled() {
+        return localStorage.getItem('qmlplayground-ai-openrouter-enabled') === 'true';
     }
 
     static getAIModel() {
         return localStorage.getItem('qmlplayground-ai-model') || QMLAI_DEFAULT_MODEL;
+    }
+
+    static getAIOpenRouterKey() {
+        return localStorage.getItem('qmlplayground-ai-openrouter-key') || '';
+    }
+
+    static _providerForModelId(id) {
+        if (QMLAI_MODELS.some(m => m.id === id)) return 'webllm';
+        if (OPENROUTER_MODELS.some(m => m.id === id)) return 'openrouter';
+        // Heuristic: OpenRouter ids are slash-namespaced.
+        return id.includes('/') ? 'openrouter' : 'webllm';
     }
 
     static getAISystemPrompt() {
@@ -141,8 +169,13 @@ class QmlPlayground extends EventTarget {
         this.editor = null;
         this.project = new QmlProject({ entry: 'Main.qml' });
         this.activePath = this.project.entry; // file currently shown in the editor
+        const activeModelId = QmlPlayground.getAIModel();
+        const activeProvider = QmlPlayground._providerForModelId(activeModelId);
         this.ai = new QmlAI({
-            modelId: QmlPlayground.getAIModel(),
+            provider: activeProvider,
+            modelId: activeProvider === 'webllm' ? activeModelId : QMLAI_DEFAULT_MODEL,
+            openrouterKey: QmlPlayground.getAIOpenRouterKey(),
+            openrouterModel: activeProvider === 'openrouter' ? activeModelId : OPENROUTER_DEFAULT_MODEL,
             systemPrompt: QmlPlayground.getAISystemPrompt(),
         });
         this._aiLog = []; // { ts, type: 'prompt'|'response'|'errors'|'info', text }
@@ -618,7 +651,8 @@ class QmlPlayground extends EventTarget {
                 background: var(--bg-secondary);
                 border: 1px solid var(--border);
                 border-radius: 8px;
-                width: 360px;
+                width: 640px;
+                max-width: 92vw;
                 box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
             }
 
@@ -647,17 +681,32 @@ class QmlPlayground extends EventTarget {
 
             .settings-body {
                 padding: 16px;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 16px 20px;
+            }
+
+            .settings-section {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .settings-section-wide {
+                grid-column: 1 / -1;
             }
 
             .settings-row {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                margin-bottom: 8px;
             }
 
             .settings-label {
-                font-size: 13px;
+                font-size: 12px;
+                color: var(--text-secondary);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
 
             .settings-build-mode,
@@ -676,17 +725,10 @@ class QmlPlayground extends EventTarget {
                 line-height: 1.5;
             }
 
-            .settings-divider {
-                height: 1px;
-                background: var(--border);
-                margin: 12px 0;
-            }
-
             .settings-checkboxes {
                 display: flex;
                 flex-direction: column;
                 gap: 6px;
-                margin: 8px 0;
             }
 
             .settings-checkboxes label {
@@ -1216,6 +1258,33 @@ class QmlPlayground extends EventTarget {
                 background: var(--accent-hover);
             }
 
+            .settings-ai-providers.hidden,
+            .settings-ai-openrouter-key-row.hidden {
+                display: none;
+            }
+
+            .settings-ai-key-label {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 13px;
+            }
+
+            .settings-ai-key-label span {
+                flex-shrink: 0;
+            }
+
+            .settings-ai-key-label input {
+                flex: 1;
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+                border-radius: 4px;
+                padding: 6px 8px;
+                font-size: 12px;
+                font-family: 'Fira Code', monospace;
+            }
+
             /* CodeMirror overrides */
             .CodeMirror {
                 height: 100% !important;
@@ -1251,43 +1320,59 @@ class QmlPlayground extends EventTarget {
                         <button class="btn-settings-close">&times;</button>
                     </div>
                     <div class="settings-body">
-                        <div class="settings-row">
-                            <label class="settings-label">Theme</label>
+                        <section class="settings-section">
+                            <div class="settings-label">Theme</div>
                             <select class="settings-theme">
                                 <option value="system">System</option>
                                 <option value="dark">Dark</option>
                                 <option value="light">Light</option>
                             </select>
-                        </div>
-                        <div class="settings-divider"></div>
-                        <div class="settings-row">
-                            <label class="settings-label">Build Mode</label>
+                        </section>
+
+                        <section class="settings-section">
+                            <div class="settings-label">Build Mode</div>
                             <select class="settings-build-mode">
                                 <option value="static">Static (monolithic)</option>
                                 <option value="shared">Shared (dynamic linking)</option>
                             </select>
-                        </div>
-                        <div class="settings-hint">
-                            Static: all Qt modules linked into one binary.<br>
-                            Shared: Qt modules loaded on demand (smaller initial download).
-                        </div>
-                        <div class="settings-divider"></div>
-                        <div class="settings-label">Logging Categories</div>
-                        <div class="settings-checkboxes">
-                            <label><input type="checkbox" data-rule="qt.qml.import.debug=true"> qt.qml.import</label>
-                            <label><input type="checkbox" data-rule="qt.qml.pluginloadblob.debug=true"> qt.qml.pluginloadblob</label>
-                            <label><input type="checkbox" data-rule="qt.qml.typeresolution.debug=true"> qt.qml.typeresolution</label>
-                            <label><input type="checkbox" data-rule="qt.qpa.debug=true"> qt.qpa</label>
-                        </div>
-                        <textarea class="settings-logging-rules" rows="3"
-                            placeholder="e.g. qt.qml.import.debug=true"></textarea>
-                        <button class="btn-apply-logging">Apply (reloads runtime)</button>
-                        <div class="settings-divider"></div>
-                        <div class="settings-label">Experimental</div>
-                        <div class="settings-checkboxes">
-                            <label><input type="checkbox" class="settings-experimental-examples"> Show experimental examples</label>
-                            <label><input type="checkbox" class="settings-ai-enabled"> Enable AI mode (stubbed; real WebLLM hookup later)</label>
-                        </div>
+                            <div class="settings-hint">
+                                Static: all Qt modules linked into one binary.<br>
+                                Shared: Qt modules loaded on demand.
+                            </div>
+                        </section>
+
+                        <section class="settings-section settings-section-wide">
+                            <div class="settings-label">Logging Categories</div>
+                            <div class="settings-checkboxes">
+                                <label><input type="checkbox" data-rule="qt.qml.import.debug=true"> qt.qml.import</label>
+                                <label><input type="checkbox" data-rule="qt.qml.pluginloadblob.debug=true"> qt.qml.pluginloadblob</label>
+                                <label><input type="checkbox" data-rule="qt.qml.typeresolution.debug=true"> qt.qml.typeresolution</label>
+                                <label><input type="checkbox" data-rule="qt.qpa.debug=true"> qt.qpa</label>
+                            </div>
+                            <textarea class="settings-logging-rules" rows="3"
+                                placeholder="e.g. qt.qml.import.debug=true"></textarea>
+                        </section>
+
+                        <section class="settings-section">
+                            <div class="settings-label">Experimental</div>
+                            <div class="settings-checkboxes">
+                                <label><input type="checkbox" class="settings-experimental-examples"> Show experimental examples</label>
+                            </div>
+                        </section>
+
+                        <section class="settings-section">
+                            <div class="settings-label">AI</div>
+                            <div class="settings-checkboxes">
+                                <label><input type="checkbox" class="settings-ai-local-enabled"> Local (WebLLM, on-device)</label>
+                                <label><input type="checkbox" class="settings-ai-openrouter-enabled"> OpenRouter (cloud)</label>
+                            </div>
+                            <div class="settings-ai-openrouter-key-row">
+                                <label class="settings-ai-key-label">
+                                    <span>API key</span>
+                                    <input class="settings-ai-openrouter-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-..." disabled>
+                                </label>
+                            </div>
+                        </section>
                     </div>
                 </div>
             </div>
@@ -1366,8 +1451,7 @@ class QmlPlayground extends EventTarget {
 
                         <div class="ai-params-row">
                             <button class="btn-ai-params-reset" type="button">Reset to defaults</button>
-                            <span class="ai-params-hint" style="flex:1">Saved to localStorage; applied on next Generate.</span>
-                            <button class="btn-ai-params-save" type="button">Save</button>
+                            <span class="ai-params-hint" style="flex:1">Changes apply immediately on next Generate.</span>
                         </div>
                     </div>
                 </div>
@@ -1440,7 +1524,10 @@ class QmlPlayground extends EventTarget {
         this.themeSelectElement = this.shadow.querySelector('.settings-theme');
         this.buildModeSelectElement = this.shadow.querySelector('.settings-build-mode');
         this.experimentalExamplesElement = this.shadow.querySelector('.settings-experimental-examples');
-        this.aiEnabledElement = this.shadow.querySelector('.settings-ai-enabled');
+        this.aiLocalEnabledElement = this.shadow.querySelector('.settings-ai-local-enabled');
+        this.aiOpenRouterEnabledElement = this.shadow.querySelector('.settings-ai-openrouter-enabled');
+        this.aiOpenRouterKeyRowElement = this.shadow.querySelector('.settings-ai-openrouter-key-row');
+        this.aiOpenRouterKeyElement = this.shadow.querySelector('.settings-ai-openrouter-key');
         this.loggingRulesElement = this.shadow.querySelector('.settings-logging-rules');
         this.loggingCheckboxes = this.shadow.querySelectorAll('.settings-checkboxes input[type="checkbox"][data-rule]');
         this.applyLoggingElement = this.shadow.querySelector('.btn-apply-logging');
@@ -1476,7 +1563,6 @@ class QmlPlayground extends EventTarget {
         this.aiParamsMaxTokensElement = this.shadow.querySelector('.ai-params-maxtokens');
         this.aiParamsTemperatureElement = this.shadow.querySelector('.ai-params-temperature');
         this.aiParamsMaxAttemptsElement = this.shadow.querySelector('.ai-params-maxattempts');
-        this.aiParamsSaveElement = this.shadow.querySelector('.btn-ai-params-save');
         this.aiParamsResetElement = this.shadow.querySelector('.btn-ai-params-reset');
     }
 
@@ -1570,12 +1656,11 @@ class QmlPlayground extends EventTarget {
                 this._applyTheme();
             });
 
-            // Build mode selector
+            // Build mode selector — applies immediately, dialog stays open.
             this.buildModeSelectElement.value = this.buildMode;
             this.buildModeSelectElement.addEventListener('change', (e) => {
                 const mode = e.target.value;
                 localStorage.setItem('qmlplayground-build-mode', mode);
-                this.settingsOverlayElement.classList.add('hidden');
                 this._loadRuntime(mode);
             });
 
@@ -1588,15 +1673,42 @@ class QmlPlayground extends EventTarget {
                 });
             }
 
-            // AI mode toggle
-            if (this.aiEnabledElement) {
-                this.aiEnabledElement.checked = QmlPlayground.getAIEnabled();
-                this._applyAIVisibility();
-                this.aiEnabledElement.addEventListener('change', (e) => {
-                    localStorage.setItem('qmlplayground-ai-enabled', e.target.checked);
+            // AI provider toggles + OpenRouter key. Each option applies
+            // immediately; the dialog stays open. The key input is
+            // always visible but disabled until OpenRouter is checked.
+            const syncAISubrows = () => {
+                const orOn = !!this.aiOpenRouterEnabledElement?.checked;
+                if (this.aiOpenRouterKeyElement)
+                    this.aiOpenRouterKeyElement.disabled = !orOn;
+            };
+            if (this.aiLocalEnabledElement) {
+                this.aiLocalEnabledElement.checked = QmlPlayground.getAILocalEnabled();
+                this.aiLocalEnabledElement.addEventListener('change', (e) => {
+                    localStorage.setItem('qmlplayground-ai-local-enabled', e.target.checked);
+                    this._populateAIModelSelect();
                     this._applyAIVisibility();
                 });
             }
+            if (this.aiOpenRouterEnabledElement) {
+                this.aiOpenRouterEnabledElement.checked = QmlPlayground.getAIOpenRouterEnabled();
+                this.aiOpenRouterEnabledElement.addEventListener('change', (e) => {
+                    localStorage.setItem('qmlplayground-ai-openrouter-enabled', e.target.checked);
+                    this._populateAIModelSelect();
+                    this._applyAIVisibility();
+                    syncAISubrows();
+                });
+            }
+            if (this.aiOpenRouterKeyElement) {
+                this.aiOpenRouterKeyElement.value = QmlPlayground.getAIOpenRouterKey();
+                this.aiOpenRouterKeyElement.addEventListener('input', (e) => {
+                    const k = e.target.value;
+                    if (k) localStorage.setItem('qmlplayground-ai-openrouter-key', k);
+                    else   localStorage.removeItem('qmlplayground-ai-openrouter-key');
+                    this.ai.setOpenRouterKey(k);
+                });
+            }
+            this._applyAIVisibility();
+            syncAISubrows();
             this._initAIDialog();
 
             // Logging rules
@@ -1611,12 +1723,21 @@ class QmlPlayground extends EventTarget {
                 });
             });
 
-            // Apply button
-            this.applyLoggingElement.addEventListener('click', () => {
+            // Logging rules apply on textarea blur (change event) — reloads
+            // the runtime with the new rules; dialog stays open.
+            this.loggingRulesElement.addEventListener('change', () => {
                 const rules = this.loggingRulesElement.value.trim();
                 localStorage.setItem('qmlplayground-logging-rules', rules);
-                this.settingsOverlayElement.classList.add('hidden');
                 this._loadRuntime(this.buildMode);
+            });
+            // Toggling a checkbox already updates the textarea via the
+            // existing handler; piggy-back to persist + reload.
+            this.loggingCheckboxes.forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const rules = this.loggingRulesElement.value.trim();
+                    localStorage.setItem('qmlplayground-logging-rules', rules);
+                    this._loadRuntime(this.buildMode);
+                });
             });
         }
 
@@ -1970,20 +2091,16 @@ class QmlPlayground extends EventTarget {
     _initAIDialog() {
         if (!this.aiButtonElement || !this.aiPanelElement) return;
 
-        // Populate model selector
+        // Populate model selector (optgroup'd by provider).
         if (this.aiModelElement) {
-            this.aiModelElement.innerHTML = '';
-            for (const m of QMLAI_MODELS) {
-                const opt = document.createElement('option');
-                opt.value = m.id;
-                opt.textContent = m.label;
-                this.aiModelElement.appendChild(opt);
-            }
-            this.aiModelElement.value = QmlPlayground.getAIModel();
+            this._populateAIModelSelect();
             this.aiModelElement.addEventListener('change', (e) => {
-                localStorage.setItem('qmlplayground-ai-model', e.target.value);
-                this.ai.setModel(e.target.value);
-                this._setAIStatus('Model will load on next Generate.');
+                this._applySelectedAIModel(e.target.value);
+                const prov = QmlPlayground._providerForModelId(e.target.value);
+                if (prov === 'webllm')
+                    this._setAIStatus('Model will load on next Generate.');
+                else
+                    this._setAIStatus('');
             });
         }
 
@@ -2056,15 +2173,18 @@ class QmlPlayground extends EventTarget {
         this.aiParamsOverlayElement?.addEventListener('click', (e) => {
             if (e.target === this.aiParamsOverlayElement) closeParams();
         });
-        this.aiParamsSaveElement?.addEventListener('click', () => {
-            const mt = Number(this.aiParamsMaxTokensElement?.value);
-            const t  = Number(this.aiParamsTemperatureElement?.value);
-            const ma = Number(this.aiParamsMaxAttemptsElement?.value);
-            if (Number.isFinite(mt)) localStorage.setItem('qmlplayground-ai-max-tokens', String(mt));
-            if (Number.isFinite(t))  localStorage.setItem('qmlplayground-ai-temperature', String(t));
-            if (Number.isFinite(ma)) localStorage.setItem('qmlplayground-ai-max-attempts', String(ma));
-            closeParams();
-        });
+        // Apply each Params field immediately on change.
+        const persistNumber = (el, key) => {
+            if (!el) return;
+            el.addEventListener('input', () => {
+                const n = Number(el.value);
+                if (Number.isFinite(n)) localStorage.setItem(key, String(n));
+            });
+        };
+        persistNumber(this.aiParamsMaxTokensElement,   'qmlplayground-ai-max-tokens');
+        persistNumber(this.aiParamsTemperatureElement, 'qmlplayground-ai-temperature');
+        persistNumber(this.aiParamsMaxAttemptsElement, 'qmlplayground-ai-max-attempts');
+
         this.aiParamsResetElement?.addEventListener('click', () => {
             localStorage.removeItem('qmlplayground-ai-max-tokens');
             localStorage.removeItem('qmlplayground-ai-temperature');
@@ -2108,11 +2228,70 @@ class QmlPlayground extends EventTarget {
             this._renderAILog();
     }
 
+    // Populate the panel's model dropdown with provider-scoped
+    // optgroups. Each enabled provider contributes its curated list;
+    // disabled providers are omitted entirely. Selecting an option
+    // derives the provider from which list the id belongs to.
+    _populateAIModelSelect() {
+        if (!this.aiModelElement) return;
+        const localOn = QmlPlayground.getAILocalEnabled();
+        const orOn    = QmlPlayground.getAIOpenRouterEnabled();
+        const saved   = QmlPlayground.getAIModel();
+
+        this.aiModelElement.innerHTML = '';
+
+        const addGroup = (label, models) => {
+            const group = document.createElement('optgroup');
+            group.label = label;
+            for (const m of models) {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.label;
+                group.appendChild(opt);
+            }
+            this.aiModelElement.appendChild(group);
+        };
+
+        if (localOn) addGroup('Local (WebLLM)', QMLAI_MODELS);
+        if (orOn) {
+            const open    = OPENROUTER_MODELS.filter(m => m.group === 'open');
+            const frontier = OPENROUTER_MODELS.filter(m => m.group === 'frontier');
+            if (open.length)     addGroup('OpenRouter — open weights', open);
+            if (frontier.length) addGroup('OpenRouter — frontier',     frontier);
+        }
+
+        // Pick a sensible selection: saved id if still available, else
+        // first option, else nothing (means neither provider is on).
+        const allIds = [
+            ...(localOn ? QMLAI_MODELS.map(m => m.id) : []),
+            ...(orOn ? OPENROUTER_MODELS.map(m => m.id) : []),
+        ];
+        let target = allIds.includes(saved) ? saved : allIds[0];
+        if (target) {
+            this.aiModelElement.value = target;
+            this._applySelectedAIModel(target);
+        } else {
+            // Neither provider enabled — leave empty.
+            this.ai.setProvider('webllm');
+        }
+    }
+
+    _applySelectedAIModel(id) {
+        const provider = QmlPlayground._providerForModelId(id);
+        this.ai.setProvider(provider);
+        if (provider === 'openrouter') this.ai.setOpenRouterModel(id);
+        else this.ai.setModel(id);
+        localStorage.setItem('qmlplayground-ai-model', id);
+    }
+
     _populateAIParams() {
-        const model = QMLAI_MODELS.find(m => m.id === this.ai.modelId);
         if (this.aiParamsInfoElement) {
-            this.aiParamsInfoElement.textContent =
-                `Model: ${model?.label || this.ai.modelId}`;
+            const id = this.ai.activeModelId();
+            const provider = QmlPlayground._providerForModelId(id);
+            const list = provider === 'openrouter' ? OPENROUTER_MODELS : QMLAI_MODELS;
+            const m = list.find(x => x.id === id);
+            const providerLabel = provider === 'openrouter' ? 'OpenRouter' : 'WebLLM';
+            this.aiParamsInfoElement.textContent = `${providerLabel} — ${m?.label || id}`;
         }
         if (this.aiParamsMaxTokensElement)
             this.aiParamsMaxTokensElement.value = String(QmlPlayground.getAIMaxTokens());

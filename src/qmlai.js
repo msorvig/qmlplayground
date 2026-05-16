@@ -52,6 +52,26 @@ export const QMLAI_MODELS = [
 export const QMLAI_DEFAULT_MODEL =
     QMLAI_MODELS.find(m => m.default)?.id ?? QMLAI_MODELS[0].id;
 
+// Curated OpenRouter model list. Two implicit sub-groups: "Open
+// weights" (gpt-oss, qwen3) and "Frontier" (Claude/GPT-5/Gemini).
+// The selector groups them with <optgroup>.
+export const OPENROUTER_MODELS = [
+    // Open weights
+    { id: 'openai/gpt-oss-120b',   label: 'GPT-OSS 120B',         group: 'open' },
+    { id: 'openai/gpt-oss-20b',    label: 'GPT-OSS 20B',          group: 'open' },
+    { id: 'qwen/qwen3.6-35b-a3b',  label: 'Qwen3.6 35B-A3B (MoE)', group: 'open' },
+    { id: 'qwen/qwen3-coder',      label: 'Qwen3 Coder',          group: 'open' },
+    { id: 'qwen/qwen3-32b',        label: 'Qwen3 32B',            group: 'open' },
+    // Frontier
+    { id: 'anthropic/claude-sonnet-4.5', label: 'Claude Sonnet 4.5', group: 'frontier' },
+    { id: 'anthropic/claude-opus-4.5',   label: 'Claude Opus 4.5',   group: 'frontier' },
+    { id: 'openai/gpt-5',                label: 'GPT-5',             group: 'frontier' },
+    { id: 'openai/gpt-5-mini',           label: 'GPT-5 mini',        group: 'frontier' },
+    { id: 'google/gemini-2.5-pro',       label: 'Gemini 2.5 Pro',    group: 'frontier' },
+];
+
+export const OPENROUTER_DEFAULT_MODEL = OPENROUTER_MODELS[0].id;
+
 export const DEFAULT_SYSTEM_PROMPT = `You are a QML code generator embedded in the QML Playground, a browser-based Qt for WebAssembly editor. Output ONE complete .qml document and NOTHING ELSE. No prose, no explanation, no markdown fences, no leading or trailing blank lines.
 
 Rules:
@@ -109,7 +129,10 @@ export async function hasWebGPU() {
 class QmlAI extends EventTarget {
     constructor(options = {}) {
         super();
+        this.provider = options.provider ?? 'webllm'; // 'webllm' | 'openrouter'
         this.modelId = options.modelId ?? QMLAI_DEFAULT_MODEL;
+        this.openrouterKey = options.openrouterKey ?? '';
+        this.openrouterModel = options.openrouterModel ?? OPENROUTER_DEFAULT_MODEL;
         this.systemPrompt = options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
         this._engine = null;
         this._loadedModelId = null;
@@ -117,6 +140,16 @@ class QmlAI extends EventTarget {
         this._webllm = null;
         this._messages = null; // current session's message history
         this._initialPrompt = null;
+        this._abortCtrl = null; // active fetch AbortController for OpenRouter
+    }
+
+    setProvider(p) { this.provider = p; }
+    setOpenRouterKey(k) { this.openrouterKey = k || ''; }
+    setOpenRouterModel(m) { this.openrouterModel = m || OPENROUTER_DEFAULT_MODEL; }
+
+    // Active model id depending on provider.
+    activeModelId() {
+        return this.provider === 'openrouter' ? this.openrouterModel : this.modelId;
     }
 
     setSystemPrompt(text) {
@@ -128,6 +161,7 @@ class QmlAI extends EventTarget {
     }
 
     isReady() {
+        if (this.provider === 'openrouter') return !!this.openrouterKey;
         return !!this._engine && this._loadedModelId === this.modelId;
     }
 
@@ -222,6 +256,10 @@ Output a NEW, complete corrected .qml document. Take a different approach for th
     // on this attempt.
     async runSession({ onToken, onLoadProgress, temperature = 0.2, maxTokens = 1024 } = {}) {
         if (!this._messages) throw new Error('No active AI session');
+
+        if (this.provider === 'openrouter')
+            return this._runOpenRouter({ onToken, temperature, maxTokens });
+
         if (!await hasWebGPU())
             throw new Error('WebGPU is not available in this browser');
 
@@ -292,9 +330,108 @@ Output a NEW, complete corrected .qml document. Take a different approach for th
         this._initialPrompt = null;
     }
 
-    // Cancel an in-flight generation.
+    // Cancel an in-flight generation (works for either provider).
     interrupt() {
+        try { this._abortCtrl?.abort(); } catch (_) { /* ignore */ }
         try { this._engine?.interruptGenerate(); } catch (_) { /* ignore */ }
+    }
+
+    // Stream from OpenRouter's chat completions endpoint via SSE.
+    async _runOpenRouter({ onToken, temperature, maxTokens }) {
+        if (!this.openrouterKey)
+            throw new Error('OpenRouter API key not set — open Params to add one.');
+
+        const ctrl = new AbortController();
+        this._abortCtrl = ctrl;
+
+        let response;
+        try {
+            response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                signal: ctrl.signal,
+                headers: {
+                    'Authorization': `Bearer ${this.openrouterKey}`,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': window.location.origin || 'https://msorvig.github.io/qmlplayground',
+                    'X-Title': 'QML Playground',
+                },
+                body: JSON.stringify({
+                    model: this.openrouterModel,
+                    messages: this._messages,
+                    stream: true,
+                    temperature,
+                    max_tokens: maxTokens,
+                }),
+            });
+        } catch (e) {
+            this._abortCtrl = null;
+            if (e.name === 'AbortError') return { qml: '', finishReason: 'cancel' };
+            throw e;
+        }
+
+        if (!response.ok) {
+            this._abortCtrl = null;
+            const text = await response.text().catch(() => '');
+            throw new Error(`OpenRouter ${response.status}: ${text || response.statusText}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        let raw = '';
+        let emittedLen = 0;
+        let finishReason = null;
+
+        try {
+            outer: while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buf += decoder.decode(value, { stream: true });
+
+                let nl;
+                while ((nl = buf.indexOf('\n')) >= 0) {
+                    const line = buf.slice(0, nl).trim();
+                    buf = buf.slice(nl + 1);
+                    if (!line || !line.startsWith('data:')) continue;
+                    const payload = line.slice(5).trim();
+                    if (payload === '[DONE]') break outer;
+                    let obj;
+                    try { obj = JSON.parse(payload); } catch (_) { continue; }
+                    const choice = obj.choices?.[0];
+                    if (choice?.finish_reason) finishReason = choice.finish_reason;
+                    const delta = choice?.delta?.content ?? '';
+                    if (!delta) continue;
+                    raw += delta;
+                    const visible = stripThink(raw);
+                    const safeLen = safeEmittableLen(visible);
+                    if (safeLen > emittedLen) {
+                        const out = visible.slice(emittedLen, safeLen);
+                        emittedLen = safeLen;
+                        if (out) onToken?.(out);
+                    }
+                }
+            }
+        } catch (e) {
+            this._abortCtrl = null;
+            if (e.name === 'AbortError') {
+                const partial = stripFences(stripThink(raw)).trim();
+                if (partial) this._messages.push({ role: 'assistant', content: partial });
+                return { qml: partial, finishReason: 'cancel' };
+            }
+            throw e;
+        }
+        this._abortCtrl = null;
+
+        // Flush trailing visible chars.
+        const finalVisible = stripThink(raw);
+        if (finalVisible.length > emittedLen) {
+            const out = finalVisible.slice(emittedLen);
+            if (out) onToken?.(out);
+        }
+
+        const qml = stripFences(finalVisible).trim();
+        this._messages.push({ role: 'assistant', content: qml });
+        return { qml, finishReason };
     }
 }
 
