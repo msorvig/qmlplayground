@@ -11,11 +11,16 @@ class QmlRuntime extends EventTarget {
         const {
             mode = 'static',
             loggingRules = '',
+            module = null,
         } = config;
 
         this.container = container;
         this.mode = mode;
         this.loggingRules = loggingRules;
+        // Optional pre-compiled WebAssembly.Module (or a Promise of one).
+        // When set, qtloader instantiates from it instead of fetching and
+        // compiling the .wasm again — lets several runtimes share one compile.
+        this._module = module;
         const modeConfig = buildModes[mode] || buildModes.static;
         this._basePath = modeConfig.basePath;
         this._shared = modeConfig.shared;
@@ -57,6 +62,9 @@ class QmlRuntime extends EventTarget {
                 env.QT_LOGGING_RULES = this.loggingRules.split('\n').map(s => s.trim()).filter(Boolean).join(';');
             if (Object.keys(env).length > 0)
                 qtConfig.environment = env;
+
+            if (this._module)
+                qtConfig.module = this._module;
 
             this.instance = await qtLoad({
                 locateFile: (path) => path.endsWith('.so') ? path : `${this._basePath}/${path}`,
