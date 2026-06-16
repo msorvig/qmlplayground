@@ -983,6 +983,13 @@ class QmlPlayground extends EventTarget {
                 }
             });
 
+            // Qt-wasm installs document-level cut/copy/paste handlers that
+            // preventDefault every clipboard event. Stop propagation here so
+            // dialog inputs receive native paste.
+            for (const ev of ['paste', 'copy', 'cut']) {
+                this.settingsOverlayElement.addEventListener(ev, (e) => e.stopPropagation());
+            }
+
             // Theme selector
             this.themeSelectElement.value = this.theme;
             this.themeSelectElement.addEventListener('change', (e) => {
