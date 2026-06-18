@@ -108,6 +108,8 @@ class QmlPlayground extends EventTarget {
             this.container.setAttribute('data-theme', resolved);
         }
         this.editor?.setTheme(resolved);
+        // Match the QML preview's color scheme to the theme (light/dark).
+        this.runtime?.setColorScheme(resolved);
     }
 
     _buildDOM() {
@@ -1184,7 +1186,10 @@ class QmlPlayground extends EventTarget {
         this.log(`Loading Qt runtime (${mode})...`);
 
         const loggingRules = localStorage.getItem('qmlplayground-logging-rules') || '';
-        this.runtime = new QmlRuntime(this.containerElement, { mode, loggingRules });
+        this.runtime = new QmlRuntime(this.containerElement, {
+            mode, loggingRules,
+            colorScheme: QmlPlayground._resolveTheme(this.theme),
+        });
 
         this.runtime.on('loading', () => this._emit('loading'));
         this.runtime.on('ready', (detail) => {

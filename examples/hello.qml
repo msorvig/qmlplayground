@@ -2,12 +2,12 @@ import QtQuick
 
 Rectangle {
     anchors.fill: parent
-    color: "#1e1e1e"
+    color: palette.window
 
     Text {
         anchors.centerIn: parent
         text: "Hello, QML!"
-        color: "white"
+        color: palette.windowText
         font.pixelSize: 32
     }
 }

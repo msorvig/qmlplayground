@@ -29,6 +29,7 @@ static QGuiApplication *g_app = nullptr;
 
 #ifdef Q_OS_WASM
 #include <QScreen>
+#include <QStyleHints>
 #include <map>
 
 static emscripten::val g_onError = emscripten::val::null();
@@ -138,6 +139,19 @@ std::string getQtVersion()
     return qVersion();
 }
 
+// Force the application color scheme (process-global). "auto" follows the
+// system / browser prefers-color-scheme.
+void setColorScheme(const std::string& scheme)
+{
+    QStyleHints *hints = QGuiApplication::styleHints();
+    if (scheme == "light")
+        hints->setColorScheme(Qt::ColorScheme::Light);
+    else if (scheme == "dark")
+        hints->setColorScheme(Qt::ColorScheme::Dark);
+    else
+        hints->unsetColorScheme();
+}
+
 void setOnError(emscripten::val callback)   { g_onError = callback; }
 void setOnWarning(emscripten::val callback) { g_onWarning = callback; }
 void setOnLoaded(emscripten::val callback)  { g_onLoaded = callback; }
@@ -151,6 +165,7 @@ EMSCRIPTEN_BINDINGS(qmlplayground) {
     emscripten::function("setSizeMode", &setSizeMode);
     emscripten::function("getErrors", &getErrors);
     emscripten::function("getQtVersion", &getQtVersion);
+    emscripten::function("setColorScheme", &setColorScheme);
     emscripten::function("setOnError", &setOnError);
     emscripten::function("setOnWarning", &setOnWarning);
     emscripten::function("setOnLoaded", &setOnLoaded);

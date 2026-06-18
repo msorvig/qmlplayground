@@ -24,12 +24,14 @@ class QmlInstance {
             loggingRules = '',
             module = null,
             environment = {},
+            colorScheme = '',           // 'light' | 'dark' | 'auto'/'' (follow system)
         } = config;
 
         this.mode = mode;
         this.loggingRules = loggingRules;
         this._module = module;          // optional pre-compiled WebAssembly.Module
         this._environment = environment;
+        this._colorScheme = colorScheme;
 
         const modeConfig = buildModes[mode] || buildModes.static;
         this._basePath = modeConfig.basePath;
@@ -95,10 +97,22 @@ class QmlInstance {
             this._views.get(id)?._emit('warning', { line, column, message }));
         this.module.setOnLoaded((id) =>
             this._views.get(id)?._emit('qmlloaded'));
+
+        // Force the color scheme (process-global), before any view loads QML.
+        if (this._colorScheme)
+            this.module.setColorScheme(this._colorScheme);
     }
 
     get qtVersion() {
         return this.module ? this.module.getQtVersion() : '';
+    }
+
+    // Force the color scheme ('light' | 'dark' | 'auto'/''). Process-global,
+    // live-settable; remembered so it survives a (re)load.
+    setColorScheme(scheme) {
+        this._colorScheme = scheme;
+        if (this.module && scheme)
+            this.module.setColorScheme(scheme);
     }
 
     // --- view lifecycle / ops, used by QmlRuntime ---
@@ -150,6 +164,7 @@ class QmlRuntime extends EventTarget {
             module: config.module ?? null,
             environment: config.environment ?? {},
             loggingRules: config.loggingRules ?? '',
+            colorScheme: config.colorScheme ?? '',
         };
 
         this._id = null;
@@ -238,6 +253,11 @@ class QmlRuntime extends EventTarget {
     setSizeMode(fillWidth, fillHeight) {
         if (this.ready)
             this._instance._setSizeMode(this._id, fillWidth, fillHeight);
+    }
+
+    // Force the color scheme for this view's instance (process-global).
+    setColorScheme(scheme) {
+        this._instance?.setColorScheme(scheme);
     }
 
     loadQml(source) {

@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 Rectangle {
     anchors.fill: parent
-    color: "#1e1e1e"
+    color: palette.window
 
     ColumnLayout {
         anchors.centerIn: parent
@@ -13,7 +13,7 @@ Rectangle {
         Label {
             text: "Qt Quick Controls"
             font.pixelSize: 24
-            color: "white"
+            color: palette.windowText
             Layout.alignment: Qt.AlignHCenter
         }
 
