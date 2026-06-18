@@ -8,12 +8,16 @@
 #include <QQuickItem>
 #include <memory>
 
+class QScreen;
+
 class QmlRuntime : public QObject
 {
     Q_OBJECT
 
 public:
-    explicit QmlRuntime(QObject *parent = nullptr);
+    // `screen` places this view's window on a specific QScreen (i.e. a
+    // specific DOM container). Null uses the default/primary screen.
+    explicit QmlRuntime(QScreen *screen = nullptr, QObject *parent = nullptr);
     ~QmlRuntime();
 
     void loadQml(const QString &source);

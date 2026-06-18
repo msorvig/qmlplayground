@@ -4,13 +4,18 @@
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QFileInfo>
+#include <QScreen>
 
-QmlRuntime::QmlRuntime(QObject *parent)
+QmlRuntime::QmlRuntime(QScreen *screen, QObject *parent)
     : QObject(parent)
     , m_engine(std::make_unique<QQmlEngine>())
     , m_window(std::make_unique<QQuickWindow>())
 {
     m_window->setTitle("QML Playground");
+    // Put the window on the given screen (DOM container) before showing, so
+    // its canvas is created in that container.
+    if (screen)
+        m_window->setScreen(screen);
     m_window->resize(400, 400);
     m_window->show();
 
