@@ -67,6 +67,13 @@ void clearContent()
     }
 }
 
+void setSizeMode(bool fillWidth, bool fillHeight)
+{
+    if (g_runtime) {
+        g_runtime->setSizePolicy(fillWidth, fillHeight);
+    }
+}
+
 void setOnError(emscripten::val callback)
 {
     g_onError = callback;
@@ -110,6 +117,7 @@ EMSCRIPTEN_BINDINGS(qmlplayground) {
     emscripten::function("getErrors", &getErrors);
     emscripten::function("getQtVersion", &getQtVersion);
     emscripten::function("clearContent", &clearContent);
+    emscripten::function("setSizeMode", &setSizeMode);
     emscripten::function("setOnError", &setOnError);
     emscripten::function("setOnWarning", &setOnWarning);
     emscripten::function("setOnLoaded", &setOnLoaded);

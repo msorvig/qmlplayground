@@ -26,6 +26,12 @@ QmlRuntime::QmlRuntime(QObject *parent)
 
     // Capture runtime warnings
     connect(m_engine.get(), &QQmlEngine::warnings, this, &QmlRuntime::handleWarnings);
+
+    // Re-apply sizing when the window (canvas) is resized.
+    connect(m_window->contentItem(), &QQuickItem::widthChanged, this,
+            [this] { applyRootSizing(); });
+    connect(m_window->contentItem(), &QQuickItem::heightChanged, this,
+            [this] { applyRootSizing(); });
 }
 
 QmlRuntime::~QmlRuntime() = default;
@@ -146,23 +152,50 @@ void QmlRuntime::handleComponentStatus()
         m_rootItem->setParentItem(m_window->contentItem());
         m_rootItem->setOpacity(1.0);
 
-        // Honor anchors.fill: parent
-        m_rootItem->setSize(m_window->contentItem()->size());
+        // Re-center (or re-fill) when the item's own size settles — e.g. a
+        // control's implicit size, or content-driven growth.
+        connect(m_rootItem, &QQuickItem::widthChanged, this,
+                [this] { applyRootSizing(); });
+        connect(m_rootItem, &QQuickItem::heightChanged, this,
+                [this] { applyRootSizing(); });
 
-        // Track window resize
-        connect(m_window->contentItem(), &QQuickItem::widthChanged, this, [this]() {
-            if (m_rootItem) {
-                m_rootItem->setWidth(m_window->contentItem()->width());
-            }
-        });
-        connect(m_window->contentItem(), &QQuickItem::heightChanged, this, [this]() {
-            if (m_rootItem) {
-                m_rootItem->setHeight(m_window->contentItem()->height());
-            }
-        });
+        applyRootSizing();
     }
 
     emit loaded();
+}
+
+void QmlRuntime::setSizePolicy(bool fillWidth, bool fillHeight)
+{
+    m_fillWidth = fillWidth;
+    m_fillHeight = fillHeight;
+    applyRootSizing();
+}
+
+void QmlRuntime::applyRootSizing()
+{
+    if (!m_rootItem)
+        return;
+
+    const qreal cw = m_window->contentItem()->width();
+    const qreal ch = m_window->contentItem()->height();
+
+    // Fill the axis (stretch to the window) or keep the implicit size and
+    // center it. Setting width/height to the same value is a no-op in Qt, so
+    // the widthChanged/heightChanged connections above don't recurse.
+    if (m_fillWidth) {
+        m_rootItem->setX(0);
+        m_rootItem->setWidth(cw);
+    } else {
+        m_rootItem->setX(qMax(qreal(0), (cw - m_rootItem->width()) / 2));
+    }
+
+    if (m_fillHeight) {
+        m_rootItem->setY(0);
+        m_rootItem->setHeight(ch);
+    } else {
+        m_rootItem->setY(qMax(qreal(0), (ch - m_rootItem->height()) / 2));
+    }
 }
 
 void QmlRuntime::clearErrors()

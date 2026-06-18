@@ -12,11 +12,15 @@ class QmlRuntime extends EventTarget {
             mode = 'static',
             loggingRules = '',
             module = null,
+            environment = {},
         } = config;
 
         this.container = container;
         this.mode = mode;
         this.loggingRules = loggingRules;
+        // Extra environment variables set on the wasm instance at launch
+        // (e.g. QT_QUICK_CONTROLS_STYLE). Read by Qt before main() runs.
+        this._environment = environment;
         // Optional pre-compiled WebAssembly.Module (or a Promise of one).
         // When set, qtloader instantiates from it instead of fetching and
         // compiling the .wasm again — lets several runtimes share one compile.
@@ -60,6 +64,7 @@ class QmlRuntime extends EventTarget {
                 env.QML_IMPORT_PATH = `${this._basePath}/qt/qml`;
             if (this.loggingRules)
                 env.QT_LOGGING_RULES = this.loggingRules.split('\n').map(s => s.trim()).filter(Boolean).join(';');
+            Object.assign(env, this._environment);
             if (Object.keys(env).length > 0)
                 qtConfig.environment = env;
 
@@ -149,6 +154,14 @@ class QmlRuntime extends EventTarget {
             this.instance.qtResizeAllScreens(this._pendingResizeEntry);
             this._pendingResizeEntry = null;
         }
+    }
+
+    // Set how the root item is sized: fill the canvas on an axis, or keep
+    // the item's implicit size and center it on that axis. Set before
+    // loadQml so the next load picks it up.
+    setSizeMode(fillWidth, fillHeight) {
+        if (this.ready)
+            this.instance.setSizeMode(!!fillWidth, !!fillHeight);
     }
 
     // Load QML source code
