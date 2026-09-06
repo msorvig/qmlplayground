@@ -35,6 +35,12 @@ class QmlPlayground extends EventTarget {
         return stored === null ? true : stored === 'true';
     }
 
+    // Accessibility: expose the scene to screen readers (default on).
+    static getAccessibility() {
+        const stored = localStorage.getItem('qmlplayground-accessibility');
+        return stored === null ? true : stored === 'true';
+    }
+
     static _resolveTheme(theme) {
         if (theme === 'system') {
             return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
@@ -780,6 +786,17 @@ class QmlPlayground extends EventTarget {
                             </div>
                         </section>
 
+                        <section class="settings-section">
+                            <div class="settings-label">Accessibility</div>
+                            <div class="settings-checkboxes">
+                                <label><input type="checkbox" class="settings-accessibility"> Expose the scene to screen readers</label>
+                            </div>
+                            <div class="settings-hint">
+                                Qt mirrors the scene as accessible HTML elements.<br>
+                                Changing this reloads the runtime.
+                            </div>
+                        </section>
+
                         <section class="settings-section settings-section-wide">
                             <div class="settings-label">Logging Categories</div>
                             <div class="settings-checkboxes">
@@ -865,6 +882,7 @@ class QmlPlayground extends EventTarget {
         this.buildModeSelectElement = this.shadow.querySelector('.settings-build-mode');
         this.experimentalExamplesElement = this.shadow.querySelector('.settings-experimental-examples');
         this.hotReloadElement = this.shadow.querySelector('.settings-hot-reload');
+        this.accessibilityElement = this.shadow.querySelector('.settings-accessibility');
         this.aiLocalEnabledElement = this.shadow.querySelector('.settings-ai-local-enabled');
         this.aiOpenRouterEnabledElement = this.shadow.querySelector('.settings-ai-openrouter-enabled');
         this.aiOpenRouterKeyRowElement = this.shadow.querySelector('.settings-ai-openrouter-key-row');
@@ -1042,6 +1060,17 @@ class QmlPlayground extends EventTarget {
                         return;
                     }
                     this.log(`Hot reload ${on ? 'enabled' : 'disabled'}`);
+                });
+            }
+
+            // Accessibility toggle. QT_WASM_ENABLE_ACCESSIBILITY is read at
+            // platform startup, so a change reloads the runtime.
+            if (this.accessibilityElement) {
+                this.accessibilityElement.checked = QmlPlayground.getAccessibility();
+                this.accessibilityElement.addEventListener('change', (e) => {
+                    localStorage.setItem('qmlplayground-accessibility', e.target.checked);
+                    if (this.runtime)
+                        this._loadRuntime(this.buildMode);
                 });
             }
 
@@ -1227,6 +1256,7 @@ class QmlPlayground extends EventTarget {
             mode, loggingRules,
             colorScheme: QmlPlayground._resolveTheme(this.theme),
             hotReload: QmlPlayground.getHotReload(),
+            accessibility: QmlPlayground.getAccessibility(),
         });
 
         this.runtime.on('loading', () => this._emit('loading'));
@@ -1236,6 +1266,8 @@ class QmlPlayground extends EventTarget {
             this.log(`Qt ${detail.qtVersion} ready [${mode}] (${detail.loadTime.toFixed(0)}ms)`, 'success');
             if (QmlPlayground.getHotReload())
                 this.log(`Hot reload ${this.runtime.hotReloadAvailable ? 'enabled' : 'unavailable in this runtime'}`);
+            if (this.runtime.accessibility)
+                this.log('Accessibility enabled');
             this._emit('ready', detail);
             // Run initial code if editor has content
             if (this.editor && this.editor.getValue().trim()) {

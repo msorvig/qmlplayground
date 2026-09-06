@@ -132,6 +132,7 @@ whose text *is* the sample and an empty `.preview` element for the runtime:
 | `instancing` | `'isolated'` | `'isolated'`: one wasm instance per preview, so each can have its own Controls style. `'shared'`: one instance hosts all previews — lighter, but one style for the page |
 | `colorScheme` | `'light'` | `'light'`, `'dark'` or `'auto'` for the previews. The editors stay light |
 | `hotReload` | `true` | Patch a preview in place when its sample is edited, so it keeps its state. See [Hot reload](#hot-reload) under `QmlRuntime` |
+| `accessibility` | `true` | Expose the previews to screen readers, as for `QmlRuntime` |
 
 The wasm is fetched and compiled once per viewer and every preview
 instantiates from that one compiled module, so a page with twenty previews
@@ -196,6 +197,7 @@ const runtime = new QmlRuntime(document.getElementById('container'), {
 | `mode` | `'static'` | `'static'` or `'shared'` |
 | `loggingRules` | `''` | Qt logging filter rules (semicolon-separated), passed via `QT_LOGGING_RULES` |
 | `hotReload` | `false` | Start the QmlPreview service in the wasm instance and use it for `loadProject()`; see [Hot reload](#hot-reload) |
+| `accessibility` | `false` | Expose the scene to screen readers: sets `QT_WASM_ENABLE_ACCESSIBILITY=1`, and Qt mirrors the scene as accessible HTML elements. Read at startup, so it is fixed for the instance |
 
 #### Loading QML
 
@@ -404,7 +406,9 @@ The playground supports two build modes:
 
 Users can switch between modes at runtime via the Settings dialog (gear icon).
 The selection persists in localStorage. The same dialog has the Hot Reload
-toggle (on by default): off, every run recreates the scene.
+toggle (on by default): off, every run recreates the scene. It also has the
+Accessibility toggle (on by default), which exposes the scene to screen
+readers and reloads the runtime when changed.
 
 ## Building
 

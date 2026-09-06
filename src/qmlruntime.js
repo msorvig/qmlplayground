@@ -99,6 +99,7 @@ class QmlInstance {
             environment = {},
             colorScheme = '',           // 'light' | 'dark' | 'auto'/'' (follow system)
             hotReload = false,          // start the QmlPreview service (see below)
+            accessibility = false,      // expose the scene to screen readers
         } = config;
 
         this.mode = mode;
@@ -122,6 +123,9 @@ class QmlInstance {
         // the service has confirmed in-place updates.
         this._hotReload = hotReload;
         this.hotReload = false;
+        // Accessibility: Qt mirrors the scene as accessible HTML elements.
+        // Read by the platform plugin at startup, so it is an env var.
+        this.accessibility = accessibility;
         this._previewSink = null;       // view with a hot reload in flight
         this._lastPreviewView = null;   // ... or the last one that had
 
@@ -168,6 +172,8 @@ class QmlInstance {
             env.QML_IMPORT_PATH = `${this._assetBase}/qt/qml`;
         if (this.loggingRules)
             env.QT_LOGGING_RULES = this.loggingRules.split('\n').map(s => s.trim()).filter(Boolean).join(';');
+        if (this.accessibility)
+            env.QT_WASM_ENABLE_ACCESSIBILITY = '1';
         Object.assign(env, this._environment);
         if (Object.keys(env).length > 0)
             qtConfig.environment = env;
@@ -307,6 +313,7 @@ class QmlRuntime extends EventTarget {
             loggingRules: config.loggingRules ?? '',
             colorScheme: config.colorScheme ?? '',
             hotReload: config.hotReload ?? false,
+            accessibility: config.accessibility ?? false,
         };
 
         // Use hot reload for loadProject() when the instance offers it. May be
@@ -334,6 +341,9 @@ class QmlRuntime extends EventTarget {
     // updates. Requires the instance to have been created with
     // `hotReload: true`; there is no enabling it after the fact.
     get hotReloadAvailable() { return !!this._instance?.hotReload; }
+
+    // True when the instance was started with accessibility enabled.
+    get accessibility() { return !!(this._instance?.accessibility ?? this._instanceConfig.accessibility); }
 
     async load() {
         this._loadStartTime = performance.now();

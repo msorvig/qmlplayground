@@ -60,7 +60,7 @@ class QmlComponentViewer {
     constructor(config = {}) {
         const { mode = 'static', preamble = '', style = '',
                 instancing = 'isolated', colorScheme = 'light',
-                hotReload = true } = config;
+                hotReload = true, accessibility = true } = config;
         this.mode = mode;
         this._basePath = mode === 'shared' ? 'shared' : 'static';
         // Hot reload: edits to a sample patch its running preview in place
@@ -68,6 +68,9 @@ class QmlComponentViewer {
         // is being edited. Needs the QmlPreview service in the runtime, which
         // is started per wasm instance; each preview's runtime uses it.
         this.hotReload = hotReload;
+        // Accessibility: expose the previews to screen readers
+        // (QT_WASM_ENABLE_ACCESSIBILITY, read at instance startup).
+        this.accessibility = accessibility;
         // 'isolated' (default): one wasm instance per preview — each can have
         // its own Controls style. 'shared': one wasm instance hosting all the
         // previews (lighter; one style for the whole page).
@@ -128,6 +131,7 @@ class QmlComponentViewer {
                     environment: this._environment(),
                     colorScheme: this.colorScheme,
                     hotReload: this.hotReload,
+                    accessibility: this.accessibility,
                 });
             }
             return new QmlRuntime(container, { instance: this._sharedInstance,
@@ -139,6 +143,7 @@ class QmlComponentViewer {
             environment: this._environment(),
             colorScheme: this.colorScheme,
             hotReload: this.hotReload,
+            accessibility: this.accessibility,
         });
     }
 
