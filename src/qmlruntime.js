@@ -85,7 +85,14 @@ class QmlInstance {
             qtConfig.module = this._module;
 
         this.module = await qtLoad({
-            locateFile: (path) => path.endsWith('.so') ? path : `${this._basePath}/${path}`,
+            // .so paths that already carry a directory are resolvable URLs and
+            // pass through. Bare names come from a side module's needed-library
+            // list, which records basenames only; those live in qt/lib.
+            locateFile: (path) => {
+                if (!path.endsWith('.so'))
+                    return `${this._basePath}/${path}`;
+                return path.includes('/') ? path : `${this._basePath}/qt/lib/${path}`;
+            },
             qt: qtConfig,
         });
 
