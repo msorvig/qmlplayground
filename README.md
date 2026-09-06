@@ -28,6 +28,7 @@ into `dist/`, so the pages and the modules they import end up as siblings.
 - Auto-run on code changes
 - Error and warning display with line markers
 - Built-in examples for QtQuick, QtQuick Controls, Qt Quick 3D, and Qt Graphs
+- Hot reload: edits patch the running scene in place, so it keeps its state
 - Embeddable live previews for documentation pages
 
 ## Quick Start
@@ -397,7 +398,8 @@ The playground supports two build modes:
 | Deploy dir | `dist/static/` | `dist/shared/` |
 
 Users can switch between modes at runtime via the Settings dialog (gear icon).
-The selection persists in localStorage.
+The selection persists in localStorage. The same dialog has the Hot Reload
+toggle (on by default): off, every run recreates the scene.
 
 ## Building
 

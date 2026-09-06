@@ -29,6 +29,12 @@ class QmlPlayground extends EventTarget {
         return localStorage.getItem('qmlplayground-experimental-examples') === 'true';
     }
 
+    // Hot reload: patch the running scene in place on edits (default on).
+    static getHotReload() {
+        const stored = localStorage.getItem('qmlplayground-hot-reload');
+        return stored === null ? true : stored === 'true';
+    }
+
     static _resolveTheme(theme) {
         if (theme === 'system') {
             return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
@@ -763,6 +769,17 @@ class QmlPlayground extends EventTarget {
                             </div>
                         </section>
 
+                        <section class="settings-section">
+                            <div class="settings-label">Hot Reload</div>
+                            <div class="settings-checkboxes">
+                                <label><input type="checkbox" class="settings-hot-reload"> Patch the running scene in place</label>
+                            </div>
+                            <div class="settings-hint">
+                                Edits update the live objects, which keep their state.<br>
+                                Off: every run recreates the scene.
+                            </div>
+                        </section>
+
                         <section class="settings-section settings-section-wide">
                             <div class="settings-label">Logging Categories</div>
                             <div class="settings-checkboxes">
@@ -847,6 +864,7 @@ class QmlPlayground extends EventTarget {
         this.themeSelectElement = this.shadow.querySelector('.settings-theme');
         this.buildModeSelectElement = this.shadow.querySelector('.settings-build-mode');
         this.experimentalExamplesElement = this.shadow.querySelector('.settings-experimental-examples');
+        this.hotReloadElement = this.shadow.querySelector('.settings-hot-reload');
         this.aiLocalEnabledElement = this.shadow.querySelector('.settings-ai-local-enabled');
         this.aiOpenRouterEnabledElement = this.shadow.querySelector('.settings-ai-openrouter-enabled');
         this.aiOpenRouterKeyRowElement = this.shadow.querySelector('.settings-ai-openrouter-key-row');
@@ -1007,6 +1025,25 @@ class QmlPlayground extends EventTarget {
                 localStorage.setItem('qmlplayground-build-mode', mode);
                 this._loadRuntime(mode);
             });
+
+            // Hot reload toggle. The view-level flag applies to the next run.
+            // The service behind it has to be started with the runtime, so
+            // turning it on for a runtime that was loaded without it reloads
+            // the runtime (like a build mode change).
+            if (this.hotReloadElement) {
+                this.hotReloadElement.checked = QmlPlayground.getHotReload();
+                this.hotReloadElement.addEventListener('change', (e) => {
+                    const on = e.target.checked;
+                    localStorage.setItem('qmlplayground-hot-reload', on);
+                    if (!this.runtime) return;
+                    this.runtime.hotReload = on;
+                    if (on && !this.runtime.hotReloadAvailable) {
+                        this._loadRuntime(this.buildMode);
+                        return;
+                    }
+                    this.log(`Hot reload ${on ? 'enabled' : 'disabled'}`);
+                });
+            }
 
             // Experimental examples toggle
             if (this.experimentalExamplesElement) {
@@ -1189,6 +1226,7 @@ class QmlPlayground extends EventTarget {
         this.runtime = new QmlRuntime(this.containerElement, {
             mode, loggingRules,
             colorScheme: QmlPlayground._resolveTheme(this.theme),
+            hotReload: QmlPlayground.getHotReload(),
         });
 
         this.runtime.on('loading', () => this._emit('loading'));
@@ -1196,6 +1234,8 @@ class QmlPlayground extends EventTarget {
             this._hideLoading();
             this._setStatus('ready');
             this.log(`Qt ${detail.qtVersion} ready [${mode}] (${detail.loadTime.toFixed(0)}ms)`, 'success');
+            if (QmlPlayground.getHotReload())
+                this.log(`Hot reload ${this.runtime.hotReloadAvailable ? 'enabled' : 'unavailable in this runtime'}`);
             this._emit('ready', detail);
             // Run initial code if editor has content
             if (this.editor && this.editor.getValue().trim()) {
@@ -1210,8 +1250,9 @@ class QmlPlayground extends EventTarget {
             this._showIssue({ ...detail, type: 'warning' });
             this._emit('warning', detail);
         });
-        this.runtime.on('qmlloaded', () => {
-            console.log('[playground] qmlloaded callback');
+        this.runtime.on('qmlloaded', (detail) => {
+            console.log('[playground] qmlloaded callback', detail);
+            this._lastLoadWasHot = !!detail?.hot;
             this._checkErrors();
             this._emit('qmlloaded');
             this._runComplete();
@@ -1337,22 +1378,23 @@ class QmlPlayground extends EventTarget {
         const issues = this.runtime.getErrors();
         const errors = issues.filter(i => i.type === 'error' || !i.type);
         const warnings = issues.filter(i => i.type === 'warning');
+        const how = this._lastLoadWasHot ? 'hot reloaded' : 'loaded';
 
         issues.forEach(issue => this._showIssue(issue));
 
         if (errors.length > 0) {
             this._setStatus('error', errors.length);
-            this.log(`QML loaded with ${errors.length} error(s)`, 'error');
+            this.log(`QML ${how} with ${errors.length} error(s)`, 'error');
             errors.forEach(err => this.log(`  Line ${err.line}: ${err.message}`, 'error'));
             this._emit('errors', { errors, warnings });
         } else if (warnings.length > 0) {
             this._setStatus('warning', warnings.length);
-            this.log(`QML loaded with ${warnings.length} warning(s)`, 'warn');
+            this.log(`QML ${how} with ${warnings.length} warning(s)`, 'warn');
             warnings.forEach(warn => this.log(`  Line ${warn.line}: ${warn.message}`, 'warn'));
             this._emit('warnings', { warnings });
         } else {
             this._setStatus('ready');
-            this.log('QML loaded successfully', 'success');
+            this.log(`QML ${how} successfully`, 'success');
             this._emit('success');
         }
     }
