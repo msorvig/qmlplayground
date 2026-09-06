@@ -181,6 +181,7 @@ The constructor accepts an optional config object:
 const runtime = new QmlRuntime(document.getElementById('container'), {
     mode: 'shared',
     loggingRules: 'qt.qml.import.debug=true;qt.qml.pluginloadblob.debug=true',
+    hotReload: true,
 });
 ```
 
@@ -188,6 +189,7 @@ const runtime = new QmlRuntime(document.getElementById('container'), {
 |--------|---------|-------------|
 | `mode` | `'static'` | `'static'` or `'shared'` |
 | `loggingRules` | `''` | Qt logging filter rules (semicolon-separated), passed via `QT_LOGGING_RULES` |
+| `hotReload` | `false` | Start the QmlPreview service in the wasm instance and use it for `loadProject()`; see [Hot reload](#hot-reload) |
 
 #### Loading QML
 
@@ -215,6 +217,45 @@ With the `shared` build mode, `loadQml()` may trigger on-demand fetching of
 QML plugin `.so` files over HTTP. The `qmlloaded` event fires after all
 plugins have loaded and types are resolved.
 
+#### Hot reload
+
+By default every `loadProject()` recreates the scene. With `hotReload: true`
+the instance runs qtdeclarative's QmlPreview debug service in-process, and a
+project that differs from the previous one only in the *contents* of some
+files is patched in place instead: the changed documents are recompiled and
+the live objects keep their state (slider values, scroll positions, running
+animations). The first load, a different entry file, added or removed files,
+or a patch the service cannot apply all fall back to a full load. A document
+with a compile error keeps the previous scene and recovers on the next
+successful edit, still in place.
+
+```javascript
+const runtime = new QmlRuntime(container, { hotReload: true });
+await runtime.load();
+runtime.hotReloadAvailable;   // true once the service confirmed in-place updates
+runtime.hotReload = false;    // keep the service, recreate the scene on the next load
+runtime.on('qmlloaded', ({ hot, changed, elapsed }) => { /* hot: patched in place */ });
+```
+
+| Property | Description |
+|----------|-------------|
+| `hotReload` | Use in-place updates when available. Read/write, applies to the next `loadProject()` |
+| `hotReloadAvailable` | Read-only: the instance was created with `hotReload: true` and the service confirmed in-place mode. There is no enabling the service after the fact, since engines register with it when they are created |
+
+The service is reached through the in-process native debug connector, so no
+socket and no thread are involved: JS pushes the changed files and a `Load`,
+and the recompile and patch have happened when the call returns. Afterwards
+the runtime checks the root item: one the service deleted, left without a
+size, or stripped of all its children is not usable and triggers a full load.
+The last case is a current limitation of the service's rebuild: a root whose
+base type supplies its children — a Quick Controls control, whose delegates
+come from its style's QML — loses them when a structural edit (adding or
+removing a binding or object) rebuilds it, so such edits reload; binding value
+changes on the same control patch in place and keep its state. Requires a Qt
+build that ships the `qmldbg_native` and `qmldbg_preview` qmltooling plugins
+(see [Prerequisites](#prerequisites)); without them `hotReloadAvailable` stays
+false and loads are full loads.
+
 #### Methods
 
 | Method | Description |
@@ -222,7 +263,7 @@ plugins have loaded and types are resolved.
 | `load()` | Load the Qt runtime (async) |
 | `destroy()` | Tear down the runtime and clean up |
 | `loadQml(source)` | Load a single-string QML source via `QQmlComponent::setData` |
-| `loadProject(project)` | Write a `QmlProject` into Emscripten's MEMFS and load the entry file. Cross-file imports, `qmldir`, and relative URLs resolve through the in-memory filesystem |
+| `loadProject(project)` | Write a `QmlProject` into Emscripten's MEMFS (a directory per view) and load the entry file. Cross-file imports, `qmldir`, and relative URLs resolve through the in-memory filesystem. Patches in place when hot reload applies |
 | `getErrors()` | Get errors/warnings from last load |
 | `clear()` | Clear the QML scene |
 
@@ -232,7 +273,7 @@ plugins have loaded and types are resolved.
 |-------|--------|-------------|
 | `loading` | - | Runtime starting to load |
 | `ready` | `{ loadTime, qtVersion }` | Runtime ready, `loadQml` can be called |
-| `qmlloaded` | - | QML loading complete (success or error); check `getErrors()` |
+| `qmlloaded` | `{ hot, changed?, elapsed? }` | QML loading complete (success or error); check `getErrors()`. `hot` is true for an in-place update, with the changed paths and the time it took |
 | `error` | `{ line, column, message }` | Individual QML error |
 | `warning` | `{ line, column, message }` | Individual QML warning |
 
@@ -365,6 +406,12 @@ The selection persists in localStorage.
 - Qt 6.11+ built for WebAssembly (static or shared)
 - Emscripten SDK (matching your Qt build)
 - CMake 3.16+
+- For hot reload: the `qmldbg_native` and `qmldbg_preview` qmltooling plugins.
+  Upstream qtdeclarative only builds qmltooling with thread support, which
+  Qt for WebAssembly is normally configured without; the bundled qtdeclarative
+  (`qt/src/qtdeclarative`) carries the `qmltooling-nothread` patch set that
+  builds these two without it. The build works without the plugins, with hot
+  reload unavailable.
 
 ### Using build.sh
 
@@ -466,6 +513,7 @@ src/
 
   qt.conf               Qt prefix config for shared builds
   qt_plugins.json       Platform plugin preload for shared builds
+  qt_plugins_hotreload.json  qmltooling plugin preload for shared builds (hot reload)
 3rdparty/
   codemirror/           CodeMirror editor
   titillium-web/        Bundled Titillium Web font (woff2 + TTF)

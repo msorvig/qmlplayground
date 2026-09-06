@@ -11,6 +11,11 @@
 // to share ("here, use this one"). Its public API (loadQml, loadProject,
 // getErrors, setSizeMode, on, destroy, …) is unchanged from before, so
 // callers that don't care about instancing keep working.
+//
+// Hot reload: with `hotReload: true` the instance runs qtdeclarative's
+// QmlPreview debug service in-process (see main.cpp). A view whose `hotReload`
+// flag is set then patches the running scene when a project's file contents
+// change, instead of recreating it — the live objects keep their state.
 
 const buildModes = {
     'static': { basePath: 'static', shared: false },
@@ -51,6 +56,40 @@ function assetBaseFor(basePath) {
     ].join('/') || '.';
 }
 
+function snapshotFiles(project) {
+    return new Map(project.listPaths().map(p => [p, project.getFileContent(p)]));
+}
+
+// Remove `path` and everything below it from an Emscripten FS. A missing
+// path is fine.
+function removeTree(FS, path) {
+    let stat;
+    try { stat = FS.stat(path); } catch (_) { return; }
+    if (FS.isDir(stat.mode)) {
+        for (const name of FS.readdir(path)) {
+            if (name !== '.' && name !== '..')
+                removeTree(FS, `${path}/${name}`);
+        }
+        FS.rmdir(path);
+    } else {
+        FS.unlink(path);
+    }
+}
+
+// Parse QQmlComponent::errorString(): one QQmlError::toString() per line,
+// "url:line[:column]: description".
+function parseQmlErrors(text) {
+    const issues = [];
+    for (const line of text.split('\n')) {
+        if (!line.trim()) continue;
+        const m = line.match(/^(.*?):(\d+)(?::(\d+))?: (.*)$/);
+        issues.push(m ? { file: m[1], line: Number(m[2]), column: m[3] ? Number(m[3]) : 0,
+                          message: m[4], type: 'error' }
+                      : { line: 0, column: 0, message: line, type: 'error' });
+    }
+    return issues;
+}
+
 class QmlInstance {
     constructor(config = {}) {
         const {
@@ -59,6 +98,7 @@ class QmlInstance {
             module = null,
             environment = {},
             colorScheme = '',           // 'light' | 'dark' | 'auto'/'' (follow system)
+            hotReload = false,          // start the QmlPreview service (see below)
         } = config;
 
         this.mode = mode;
@@ -77,6 +117,13 @@ class QmlInstance {
         this.module = null;             // the emscripten module instance
         this._loadPromise = null;
         this._views = new Map();        // preview id -> QmlRuntime (for callback demux)
+
+        // Hot reload. `_hotReload` is the request; `hotReload` turns true once
+        // the service has confirmed in-place updates.
+        this._hotReload = hotReload;
+        this.hotReload = false;
+        this._previewSink = null;       // view with a hot reload in flight
+        this._lastPreviewView = null;   // ... or the last one that had
 
         console.log(`[qmlinstance] creating instance (mode=${mode})`);
     }
@@ -110,6 +157,10 @@ class QmlInstance {
         if (this._shared) {
             qtConfig.qtdir = `${this._assetBase}/qt`;
             qtConfig.preload = [`${this._assetBase}/qt_plugins.json`];
+            // The connector and service are plugins the loader must find in
+            // the FS at startup; only fetch them when asked for.
+            if (this._hotReload)
+                qtConfig.preload.push(`${this._assetBase}/qt_plugins_hotreload.json`);
         }
 
         const env = {};
@@ -143,12 +194,54 @@ class QmlInstance {
         this.module.setOnWarning((id, line, column, message) =>
             this._views.get(id)?._emit('warning', { line, column, message }));
         this.module.setOnLoaded((id) =>
-            this._views.get(id)?._emit('qmlloaded'));
+            this._views.get(id)?._onLoaded());
 
         // Force the color scheme (process-global), before any view loads QML.
         if (this._colorScheme)
             this.module.setColorScheme(this._colorScheme);
+
+        // Before any view: engines register with the service when created.
+        if (this._hotReload)
+            this._startHotReload();
     }
+
+    // --- hot reload (QmlPreview service) ---
+
+    // Start the in-process QmlPreview service and ask for in-place updates.
+    // The Confirmation arrives synchronously and sets `hotReload`.
+    _startHotReload() {
+        this.module.setOnPreviewMessage((type, payload) => this._onPreviewMessage(type, payload));
+        if (!this.module.startPreviewService()) {
+            console.warn('[qmlinstance] hot reload unavailable: QmlPreview service did not start');
+            return;
+        }
+        this.module.previewConfigure(true);
+        if (!this.hotReload)
+            console.warn('[qmlinstance] hot reload unavailable: in-place updates not confirmed');
+    }
+
+    _onPreviewMessage(type, payload) {
+        switch (type) {
+        case 'confirmation':
+            this.hotReload = payload === 'true';
+            console.log(`[qmlinstance] hot reload ${this.hotReload ? 'enabled' : 'declined by the service'}`);
+            return;
+        case 'request':
+            // The service asks for a file it was not given. We push files
+            // ahead of every Load; anything else falls back to MEMFS.
+            return;
+        case 'fps':
+            return;
+        }
+        // error / hotReloadFailure: to the view whose hot reload is in flight,
+        // else the last one — a recompile that had to wait for an import can
+        // report after the call returned.
+        (this._previewSink ?? this._lastPreviewView)?._onPreviewMessage(type, payload);
+    }
+
+    _previewSendFile(path, contents) { this.module.previewSendFile(path, contents); }
+    _previewLoad(url)                { this.module.previewLoad(url); }
+    _previewClearCache()             { this.module.previewClearCache(); }
 
     get qtVersion() {
         return this.module ? this.module.getQtVersion() : '';
@@ -185,6 +278,7 @@ class QmlInstance {
     _clearContent(id)           { this.module.clearContent(id); }
     _setSizeMode(id, fw, fh)    { this.module.setSizeMode(id, !!fw, !!fh); }
     _getErrors(id)              { return this.module.getErrors(id); }
+    _refreshRoot(id)            { return JSON.parse(this.module.refreshRoot(id)); }
     _resize(container)          { this.module.qtResizeContainerElement(container); }
 
     destroy() {
@@ -212,7 +306,16 @@ class QmlRuntime extends EventTarget {
             environment: config.environment ?? {},
             loggingRules: config.loggingRules ?? '',
             colorScheme: config.colorScheme ?? '',
+            hotReload: config.hotReload ?? false,
         };
+
+        // Use hot reload for loadProject() when the instance offers it. May be
+        // flipped at any time; see hotReloadAvailable.
+        this.hotReload = config.hotReload ?? false;
+        this._lastLoad = null;          // { entry, files, ok, hot } of the last loadProject
+        this._lastRoot = null;          // root state after the last usable load (health baseline)
+        this._hotErrors = [];           // errors of the last hot reload
+        this._hotMessages = null;       // collects service messages while one is in flight
 
         this._id = null;
         this.ready = false;
@@ -227,6 +330,11 @@ class QmlRuntime extends EventTarget {
     // Compatibility: expose the build mode (used to be a field).
     get mode() { return this._instance ? this._instance.mode : this._instanceConfig.mode; }
 
+    // True once the instance's QmlPreview service has confirmed in-place
+    // updates. Requires the instance to have been created with
+    // `hotReload: true`; there is no enabling it after the fact.
+    get hotReloadAvailable() { return !!this._instance?.hotReload; }
+
     async load() {
         this._loadStartTime = performance.now();
         this._emit('loading');
@@ -238,6 +346,11 @@ class QmlRuntime extends EventTarget {
 
             // Create this view (adds a screen for our container + a window).
             this._id = this._instance._addView(this.container, this);
+            // Where loadProject() writes this view's files. Per view, since
+            // views sharing an instance share one filesystem — and documents
+            // are addressed by URL, so two views must not load different
+            // documents from the same path.
+            this._projectRoot = `/projects/${this._id}`;
 
             // Notify Qt of container size changes. When resize is disabled
             // (e.g. during an active splitter drag) we remember that a resize
@@ -267,8 +380,11 @@ class QmlRuntime extends EventTarget {
             this._resizeObserver = null;
         }
         if (this._instance && this._id != null) {
-            try { this._instance._removeView(this._id, this.container); }
-            catch (e) { /* ignore cleanup errors */ }
+            try {
+                if (this._lastLoad)
+                    removeTree(this._instance.module.FS, this._projectRoot);
+                this._instance._removeView(this._id, this.container);
+            } catch (e) { /* ignore cleanup errors */ }
         }
         this._id = null;
         this.ready = false;
@@ -309,25 +425,143 @@ class QmlRuntime extends EventTarget {
 
     loadQml(source) {
         if (!this.ready) throw new Error('Runtime not ready');
+        this._lastLoad = null;   // a setData() document has no URL to hot reload
         this._instance._loadQml(this._id, source);
     }
 
     // Load a QmlProject. Writes every file into Emscripten's in-memory FS
-    // under /project/, then asks the runtime to load the entry file from that
-    // path. Lets Qt resolve cross-file imports, qmldir, and relative refs
-    // through normal filesystem plumbing.
+    // under this view's directory, then asks the runtime to load the entry
+    // file from that path. Lets Qt resolve cross-file imports, qmldir, and
+    // relative refs through normal filesystem plumbing.
+    //
+    // With hot reload on and available, a project that differs from the last
+    // one only in the contents of some files is patched in place instead: the
+    // changed documents are recompiled and the live objects keep their state.
+    // Anything else — the first load, another entry, added or removed files,
+    // a patch the service cannot apply — is a full load.
     loadProject(project) {
         if (!this.ready) throw new Error('Runtime not ready');
         const FS = this._instance.module.FS;
         if (!FS) throw new Error('Emscripten FS not exported from wasm');
 
-        const root = '/project';
+        const root = this._projectRoot;
+        if (this._hotReloadProject(project, FS, root))
+            return;
+
+        // Full load. Contents pushed to the service shadow the filesystem;
+        // drop them so the type loader reads what we write below.
+        if (this._instance.hotReload)
+            this._instance._previewClearCache();
         project.writeTo(FS, root);
+        this._lastLoad = { entry: project.entry, files: snapshotFiles(project), ok: false, hot: false };
+        this._hotErrors = [];
         this._instance._loadEntryFile(this._id, `${root}/${project.entry}`);
+    }
+
+    // The in-place path of loadProject(). Returns false when a full load is
+    // needed instead.
+    _hotReloadProject(project, FS, root) {
+        if (!this.hotReload || !this._instance.hotReload)
+            return false;
+        const last = this._lastLoad;
+        if (!last || !last.ok || last.entry !== project.entry)
+            return false;
+
+        // Only contents can be patched; a changed file set needs a full load.
+        const paths = project.listPaths();
+        if (paths.length !== last.files.size || !paths.every(p => last.files.has(p)))
+            return false;
+        const changed = paths.filter(p => project.getFileContent(p) !== last.files.get(p));
+        if (changed.length === 0)
+            return false;   // an explicit re-run of the same project restarts it
+
+        // Push the changed documents, then Load. The service dispatches on
+        // this thread, so for local documents everything — recompile, patch,
+        // error reports — has happened when previewLoad() returns.
+        const t0 = performance.now();
+        this._hotMessages = [];
+        this._instance._previewSink = this;
+        this._instance._lastPreviewView = this;
+        try {
+            for (const path of changed) {
+                const contents = project.getFileContent(path);
+                FS.writeFile(`${root}/${path}`, contents);   // keep the fallback source in sync
+                this._instance._previewSendFile(`${root}/${path}`, contents);
+            }
+            this._instance._previewLoad(`file://${root}/${project.entry}`);
+        } finally {
+            this._instance._previewSink = null;
+        }
+        const messages = this._hotMessages;
+        this._hotMessages = null;
+
+        const failure = messages.find(m => m.type === 'hotReloadFailure');
+        if (failure) {
+            console.warn(`[qmlruntime] hot reload failed (${failure.payload}); reloading`);
+            return false;
+        }
+
+        // A rebuilt root is re-parented and re-sized by refreshRoot(). Some
+        // roots come back unusable: deleted by the service, without a size,
+        // or — a Control whose base type supplies its delegates — stripped
+        // of all children by the rebuild (the service does not recreate
+        // them). Those need a full load.
+        const rootInfo = this._instance._refreshRoot(this._id);
+        const hadErrors = messages.some(m => m.type === 'error');
+        const lostChildren = rootInfo.children === 0 && (this._lastRoot?.children ?? 0) > 0;
+        if (rootInfo.kind === 'item' && !hadErrors
+                && (!rootInfo.alive || rootInfo.width <= 0 || rootInfo.height <= 0 || lostChildren)) {
+            console.warn('[qmlruntime] hot reload left no usable root; reloading', rootInfo);
+            return false;
+        }
+        if (!hadErrors)
+            this._lastRoot = rootInfo;
+
+        for (const path of changed)
+            last.files.set(path, project.getFileContent(path));
+        last.hot = true;
+        this._hotErrors = messages.filter(m => m.type === 'error')
+                                  .flatMap(m => parseQmlErrors(m.payload));
+        for (const issue of this._hotErrors)
+            this._emit('error', issue);
+        const elapsed = performance.now() - t0;
+        console.log('[qmlruntime] hot reloaded', changed.join(', '), `${elapsed.toFixed(1)}ms`, rootInfo);
+        this._emit('qmlloaded', { hot: true, changed, root: rootInfo, elapsed });
+        return true;
+    }
+
+    // Service messages attributed to this view.
+    _onPreviewMessage(type, payload) {
+        if (this._hotMessages) {
+            this._hotMessages.push({ type, payload });
+            return;
+        }
+        // Late report from a recompile that waited for an import.
+        if (type === 'error') {
+            for (const issue of parseQmlErrors(payload)) {
+                this._hotErrors.push(issue);
+                this._emit('error', issue);
+            }
+        } else if (type === 'hotReloadFailure') {
+            console.warn(`[qmlruntime] hot reload failed (${payload})`);
+            this._emit('error', { line: 0, column: 0, message: `Hot reload failed: ${payload}` });
+        }
+    }
+
+    // A full load finished (successfully or not).
+    _onLoaded() {
+        if (this._lastLoad) {
+            this._lastLoad.ok = !this.getErrors().some(i => i.type === 'error');
+            // Baseline for the hot path's health check.
+            this._lastRoot = this._lastLoad.ok ? this._instance._refreshRoot(this._id) : null;
+        }
+        this._emit('qmlloaded', { hot: false });
     }
 
     getErrors() {
         if (!this.ready) return [];
+        if (this._lastLoad?.hot)
+            return [...this._hotErrors];
         try {
             return JSON.parse(this._instance._getErrors(this._id));
         } catch (e) {

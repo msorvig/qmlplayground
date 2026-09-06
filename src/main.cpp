@@ -134,6 +134,13 @@ std::string getErrors(int id)
     return "[]";
 }
 
+std::string refreshRoot(int id)
+{
+    if (QmlRuntime *r = previewById(id))
+        return r->refreshRoot().toStdString();
+    return "{}";
+}
+
 std::string getQtVersion()
 {
     return qVersion();
@@ -156,6 +163,142 @@ void setOnError(emscripten::val callback)   { g_onError = callback; }
 void setOnWarning(emscripten::val callback) { g_onWarning = callback; }
 void setOnLoaded(emscripten::val callback)  { g_onLoaded = callback; }
 
+// --- Hot reload: the QmlPreview debug service, driven from JS ----------------
+//
+// qtdeclarative's QmlPreview service (qmldbg_preview) can patch a running
+// scene in place when a document changes: only the changed documents are
+// recompiled and the live objects keep their state. It is a debug service,
+// normally reached over a socket by tools such as qmlpreview. Here it runs
+// inside this wasm instance behind the in-process native debug connector
+// (qmldbg_native): no socket, no thread — every message is dispatched
+// synchronously on this, the only, thread.
+//
+// JS plays the client. It speaks the same wire protocol as QQmlPreviewClient;
+// the QDataStream packet encoding lives here so JS never has to emulate it.
+
+#include <QtQml/QQmlDebuggingEnabler>
+#include <QDataStream>
+#include <private/qqmldebugconnector_p.h>
+#include <private/qqmldebugservice_p.h>
+
+namespace {
+
+// Mirrors QQmlPreviewClient::Command; the values are the wire contract.
+enum PreviewCommand : qint8 {
+    PreviewFile, PreviewLoad, PreviewRequest, PreviewError, PreviewRerun, PreviewDirectory,
+    PreviewClearCache, PreviewZoom, PreviewFps, PreviewAnimationSpeed, PreviewConfiguration,
+    PreviewConfirmation, PreviewHotReloadFailure,
+};
+
+QQmlDebugService *g_previewService = nullptr;
+emscripten::val g_onPreviewMessage = emscripten::val::null();
+
+template <typename Writer>
+void previewSend(Writer &&write)
+{
+    if (!g_previewService)
+        return;
+    QByteArray data;
+    QDataStream stream(&data, QIODevice::WriteOnly);
+    stream.setVersion(QQmlDebugConnector::dataStreamVersion());
+    write(stream);
+    g_previewService->messageReceived(data);
+}
+
+// Decode a service → client packet and hand it to JS as (type, payload).
+void forwardPreviewMessage(const QString &, const QByteArray &message)
+{
+    QDataStream stream(message);
+    stream.setVersion(QQmlDebugConnector::dataStreamVersion());
+    qint8 command = -1;
+    stream >> command;
+
+    std::string type, payload;
+    auto text = [&stream]() { QString s; stream >> s; return s.toStdString(); };
+    switch (command) {
+    case PreviewError:            type = "error";            payload = text(); break;
+    case PreviewRequest:          type = "request";          payload = text(); break;
+    case PreviewHotReloadFailure: type = "hotReloadFailure"; payload = text(); break;
+    case PreviewConfirmation: {
+        bool inPlace = false;
+        stream >> inPlace;
+        type = "confirmation";
+        payload = inPlace ? "true" : "false";
+        break;
+    }
+    case PreviewFps:              type = "fps"; break;      // not decoded
+    default:                      type = "unknown"; payload = std::to_string(command); break;
+    }
+
+    if (!g_onPreviewMessage.isNull() && g_onPreviewMessage.typeOf().as<std::string>() == "function")
+        g_onPreviewMessage(type, payload);
+}
+
+} // namespace
+
+// Start the connector and the service. Must run before the first QML engine
+// is created: engines register with the connector in their constructor, and
+// the service only patches engines it has seen. Idempotent.
+bool startPreviewService()
+{
+    if (g_previewService)
+        return true;
+
+    QQmlDebuggingEnabler::enableDebugging(false);
+    QQmlDebuggingEnabler::setServices({ QStringLiteral("QmlPreview") });
+    if (!QQmlDebuggingEnabler::startDebugConnector(QStringLiteral("QQmlNativeDebugConnector"))) {
+        qWarning("QmlPreview: could not start the native debug connector");
+        return false;
+    }
+
+    QQmlDebugConnector *connector = QQmlDebugConnector::instance();
+    QQmlDebugService *service = connector ? connector->service(QStringLiteral("QmlPreview")) : nullptr;
+    if (!service) {
+        qWarning("QmlPreview: service not available");
+        return false;
+    }
+
+    // What a native debugger does through qt_qmlDebugEnableService(): the
+    // service installs its file engine handler on the transition to Enabled.
+    if (service->state() != QQmlDebugService::Enabled) {
+        service->stateAboutToBeChanged(QQmlDebugService::Enabled);
+        service->setState(QQmlDebugService::Enabled);
+        service->stateChanged(QQmlDebugService::Enabled);
+    }
+
+    QObject::connect(service, &QQmlDebugService::messageToClient, forwardPreviewMessage);
+    g_previewService = service;
+    return true;
+}
+
+void setOnPreviewMessage(emscripten::val callback) { g_onPreviewMessage = callback; }
+
+// Ask for in-place updates. The service answers with a Confirmation message.
+void previewConfigure(bool inPlace)
+{
+    previewSend([inPlace](QDataStream &s) { s << qint8(PreviewConfiguration) << inPlace; });
+}
+
+// Hand the service a document's new contents. Marks the document as changed;
+// the next Load recompiles it and patches its live objects.
+void previewSendFile(const std::string &path, const std::string &contents)
+{
+    previewSend([&](QDataStream &s) {
+        s << qint8(PreviewFile) << QString::fromStdString(path) << QByteArray::fromStdString(contents);
+    });
+}
+
+void previewLoad(const std::string &url)
+{
+    previewSend([&](QDataStream &s) { s << qint8(PreviewLoad) << QUrl(QString::fromStdString(url)); });
+}
+
+// Forget pushed file contents so the type loader reads the filesystem again.
+void previewClearCache()
+{
+    previewSend([](QDataStream &s) { s << qint8(PreviewClearCache); });
+}
+
 EMSCRIPTEN_BINDINGS(qmlplayground) {
     emscripten::function("createPreview", &createPreview);
     emscripten::function("destroyPreview", &destroyPreview);
@@ -164,11 +307,18 @@ EMSCRIPTEN_BINDINGS(qmlplayground) {
     emscripten::function("clearContent", &clearContent);
     emscripten::function("setSizeMode", &setSizeMode);
     emscripten::function("getErrors", &getErrors);
+    emscripten::function("refreshRoot", &refreshRoot);
     emscripten::function("getQtVersion", &getQtVersion);
     emscripten::function("setColorScheme", &setColorScheme);
     emscripten::function("setOnError", &setOnError);
     emscripten::function("setOnWarning", &setOnWarning);
     emscripten::function("setOnLoaded", &setOnLoaded);
+    emscripten::function("startPreviewService", &startPreviewService);
+    emscripten::function("setOnPreviewMessage", &setOnPreviewMessage);
+    emscripten::function("previewConfigure", &previewConfigure);
+    emscripten::function("previewSendFile", &previewSendFile);
+    emscripten::function("previewLoad", &previewLoad);
+    emscripten::function("previewClearCache", &previewClearCache);
 }
 #endif
 

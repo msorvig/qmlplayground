@@ -6,6 +6,7 @@
 #include <QQmlComponent>
 #include <QQuickWindow>
 #include <QQuickItem>
+#include <QPointer>
 #include <memory>
 
 class QScreen;
@@ -35,6 +36,13 @@ public:
     // e.g. a TextArea filling both and a horizontal Slider filling width.
     void setSizePolicy(bool fillWidth, bool fillHeight);
 
+    // After an in-place update (hot reload): report the root's state as JSON
+    // and mend what a rebuild can undo. The QmlPreview service rebuilds a
+    // document root in place, but the root's parent and geometry are set from
+    // here rather than by bindings, so re-establish them. The JS side falls
+    // back to a full load when the root is gone or has no size.
+    QString refreshRoot();
+
 signals:
     void errorsChanged(const QString &errors);
     void loaded();
@@ -51,8 +59,9 @@ private:
     std::unique_ptr<QQmlEngine> m_engine;
     std::unique_ptr<QQuickWindow> m_window;
     std::unique_ptr<QQmlComponent> m_component;
-    QQuickItem *m_rootItem = nullptr;
-    QQuickWindow *m_rootWindow = nullptr;
+    // QPointers: the QmlPreview service may delete a root it cannot patch.
+    QPointer<QQuickItem> m_rootItem;
+    QPointer<QQuickWindow> m_rootWindow;
     bool m_fillWidth = true;
     bool m_fillHeight = true;
     QStringList m_errors;

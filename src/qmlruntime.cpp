@@ -177,6 +177,33 @@ void QmlRuntime::setSizePolicy(bool fillWidth, bool fillHeight)
     applyRootSizing();
 }
 
+QString QmlRuntime::refreshRoot()
+{
+    QJsonObject info;
+    if (m_rootWindow) {
+        info["kind"] = "window";
+        info["alive"] = true;
+    } else if (!m_rootItem) {
+        info["kind"] = "item";
+        info["alive"] = false;
+    } else {
+        if (m_rootItem->parentItem() != m_window->contentItem()) {
+            info["reparented"] = true;
+            m_rootItem->setParentItem(m_window->contentItem());
+        }
+        applyRootSizing();
+        info["kind"] = "item";
+        info["alive"] = true;
+        info["width"] = m_rootItem->width();
+        info["height"] = m_rootItem->height();
+        info["implicitWidth"] = m_rootItem->implicitWidth();
+        info["implicitHeight"] = m_rootItem->implicitHeight();
+        info["visible"] = m_rootItem->isVisible();
+        info["children"] = int(m_rootItem->childItems().size());
+    }
+    return QString::fromUtf8(QJsonDocument(info).toJson(QJsonDocument::Compact));
+}
+
 void QmlRuntime::applyRootSizing()
 {
     if (!m_rootItem)

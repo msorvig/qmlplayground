@@ -7,7 +7,7 @@ set(CMAKE_AUTOMOC ON)
 
 option(QMLPLAYGROUND_SHARED "Build with shared/dynamic Qt libraries" OFF)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Quick3D Graphs)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml QmlPrivate Quick QuickControls2 Quick3D Graphs)
 
 qt_add_executable(qmlruntime_wasm
     src/main.cpp
@@ -50,6 +50,25 @@ if(NOT QMLPLAYGROUND_SHARED)
 endif()
 
 set_target_properties(qmlruntime_wasm PROPERTIES QT_WASM_EXTRA_EXPORTED_METHODS "ENV")
+
+# Hot reload runs qtdeclarative's QmlPreview debug service in-process (see
+# main.cpp). That needs QtQml's private debug-connector headers and, in the
+# static build, the two qmltooling plugins providing the connector and the
+# service. Only those two: the remaining qmltooling plugins would otherwise be
+# linked in by default as well.
+target_link_libraries(qmlruntime_wasm PRIVATE Qt6::QmlPrivate)
+if(NOT QMLPLAYGROUND_SHARED)
+    if(TARGET Qt6::QQmlNativeDebugConnectorFactoryPlugin
+            AND TARGET Qt6::QQmlPreviewServiceFactoryPlugin)
+        qt_import_plugins(qmlruntime_wasm
+            INCLUDE_BY_TYPE qmltooling
+                Qt6::QQmlNativeDebugConnectorFactoryPlugin
+                Qt6::QQmlPreviewServiceFactoryPlugin
+        )
+    else()
+        message(WARNING "qmltooling plugins not found in this Qt build; hot reload will be unavailable")
+    endif()
+endif()
 
 # WebAssembly-specific settings
 if(EMSCRIPTEN)
@@ -100,6 +119,7 @@ if(EMSCRIPTEN)
 
         configure_file(${CMAKE_SOURCE_DIR}/src/qt.conf ${CMAKE_BINARY_DIR}/qt.conf COPYONLY)
         configure_file(${CMAKE_SOURCE_DIR}/src/qt_plugins.json ${CMAKE_BINARY_DIR}/qt_plugins.json COPYONLY)
+        configure_file(${CMAKE_SOURCE_DIR}/src/qt_plugins_hotreload.json ${CMAKE_BINARY_DIR}/qt_plugins_hotreload.json COPYONLY)
 
         add_custom_command(TARGET deploy POST_BUILD
             COMMENT "Setting up shared Qt libraries"
@@ -110,6 +130,7 @@ if(EMSCRIPTEN)
             COMMAND ${CMAKE_COMMAND} -E copy
                 ${CMAKE_SOURCE_DIR}/src/qt.conf
                 ${CMAKE_SOURCE_DIR}/src/qt_plugins.json
+                ${CMAKE_SOURCE_DIR}/src/qt_plugins_hotreload.json
                 ${DEPLOY_DIR}/
         )
     endif()
