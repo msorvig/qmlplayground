@@ -58,8 +58,7 @@ function _readNumber(key, fallback, { min, max } = {}) {
 // ---- Persistence helpers (exported for QmlPlayground to read/write) ----
 
 export function getAILocalEnabled() {
-    const v = localStorage.getItem('qmlplayground-ai-local-enabled');
-    return v == null ? true : v === 'true';
+    return localStorage.getItem('qmlplayground-ai-local-enabled') === 'true';
 }
 
 export function getAIOpenRouterEnabled() {
