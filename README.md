@@ -131,10 +131,15 @@ whose text *is* the sample and an empty `.preview` element for the runtime:
 | `style` | `''` | Quick Controls style for every preview (`''` = the build default) |
 | `instancing` | `'isolated'` | `'isolated'`: one wasm instance per preview, so each can have its own Controls style. `'shared'`: one instance hosts all previews — lighter, but one style for the page |
 | `colorScheme` | `'light'` | `'light'`, `'dark'` or `'auto'` for the previews. The editors stay light |
+| `hotReload` | `true` | Patch a preview in place when its sample is edited, so it keeps its state. See [Hot reload](#hot-reload) under `QmlRuntime` |
 
 The wasm is fetched and compiled once per viewer and every preview
 instantiates from that one compiled module, so a page with twenty previews
 still compiles the binary a single time.
+
+Each preview is a one-file project in the runtime's in-memory filesystem
+(`preview.project`, a `QmlProject`), which is what makes it addressable for
+hot reload; a style change still relaunches the previews.
 
 #### Methods
 

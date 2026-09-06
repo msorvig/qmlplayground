@@ -9,6 +9,7 @@
 
 import { QmlRuntime, QmlInstance } from './qmlruntime.js';
 import { QmlEditor } from './qmleditor.js';
+import { QmlProject } from './qmlproject.js';
 
 // Assemble the QML actually handed to the runtime from its two parts.
 function assembleQml(preamble, sample) {
@@ -25,10 +26,17 @@ class Preview {
         this.runtime = runtime;
         // The snippet editor showing this preview's sample, if it has one.
         this.editor = editor;
+        // The document as a one-file project. A file-backed document (rather
+        // than a setData() string) is what lets the runtime hot reload it:
+        // the service addresses documents by URL.
+        this.project = new QmlProject({ entry: 'Main.qml', name: id });
     }
 
+    // Load `source` as this preview's document. With hot reload available,
+    // a changed document is patched in place; see QmlRuntime.loadProject().
     loadQml(source) {
-        this.runtime.loadQml(source);
+        this.project.setEntryContent(source);
+        this.runtime.loadProject(this.project);
     }
 
     getErrors() {
@@ -51,9 +59,15 @@ class Preview {
 class QmlComponentViewer {
     constructor(config = {}) {
         const { mode = 'static', preamble = '', style = '',
-                instancing = 'isolated', colorScheme = 'light' } = config;
+                instancing = 'isolated', colorScheme = 'light',
+                hotReload = true } = config;
         this.mode = mode;
         this._basePath = mode === 'shared' ? 'shared' : 'static';
+        // Hot reload: edits to a sample patch its running preview in place
+        // instead of recreating it, so a slider keeps its value while its code
+        // is being edited. Needs the QmlPreview service in the runtime, which
+        // is started per wasm instance; each preview's runtime uses it.
+        this.hotReload = hotReload;
         // 'isolated' (default): one wasm instance per preview — each can have
         // its own Controls style. 'shared': one wasm instance hosting all the
         // previews (lighter; one style for the whole page).
@@ -113,15 +127,18 @@ class QmlComponentViewer {
                     module: this._compileModule(),
                     environment: this._environment(),
                     colorScheme: this.colorScheme,
+                    hotReload: this.hotReload,
                 });
             }
-            return new QmlRuntime(container, { instance: this._sharedInstance });
+            return new QmlRuntime(container, { instance: this._sharedInstance,
+                                               hotReload: this.hotReload });
         }
         return new QmlRuntime(container, {
             mode: this.mode,
             module: this._compileModule(),
             environment: this._environment(),
             colorScheme: this.colorScheme,
+            hotReload: this.hotReload,
         });
     }
 
@@ -177,7 +194,9 @@ class QmlComponentViewer {
         const pre = (preamble ?? '').trim();
         const preambleLines = pre ? pre.split('\n').length : 0;
 
-        // (Re)assemble from the current editor contents and load it.
+        // (Re)assemble from the current editor contents and load it. The
+        // first run is a full load; later ones are patched in place when hot
+        // reload is available (the runtime falls back to a full load itself).
         const run = () => {
             const body = editor ? editor.getValue() : sample;
             const src = qml ?? assembleQml(preamble, body);
@@ -185,7 +204,7 @@ class QmlComponentViewer {
             if (!src) return;
             try {
                 runtime.setSizeMode(fillWidth, fillHeight);
-                runtime.loadQml(src);
+                preview.loadQml(src);
             } catch (e) {
                 editor?.addMarker(1, 0, e.message, 'error');
             }
