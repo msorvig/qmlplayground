@@ -17,6 +17,40 @@ const buildModes = {
     'shared': { basePath: 'shared', shared: true },
 };
 
+// The build directory (static/ or shared/) as a path relative to the current
+// document.
+//
+// Emscripten resolves locateFile() results against the page, qtloader fetches
+// qtdir and preload against the page, and Qt dlopens QML plugins found under
+// QML_IMPORT_PATH the same way — none of them resolve against this module. A
+// front-end page in a subdirectory would therefore hunt for the runtime assets
+// underneath that subdirectory. Deriving the path from this module's own URL
+// keeps all of it correct whatever depth the page sits at, and yields the
+// plain "static" / "shared" of old for a page next to this module.
+//
+// Note this is deliberately a relative path rather than an absolute URL: the
+// value reaches Qt as a plain path (QML_IMPORT_PATH), where a scheme would
+// not survive path normalisation.
+function assetBaseFor(basePath) {
+    const target = new URL(`./${basePath}/`, import.meta.url);
+    const page = new URL('.', document.baseURI);
+
+    // Served from a different origin: only an absolute URL can express it.
+    if (target.origin !== page.origin)
+        return target.href.replace(/\/$/, '');
+
+    const from = page.pathname.split('/').filter(Boolean);
+    const to = target.pathname.split('/').filter(Boolean);
+    let common = 0;
+    while (common < from.length && common < to.length && from[common] === to[common])
+        ++common;
+
+    return [
+        ...Array(from.length - common).fill('..'),
+        ...to.slice(common),
+    ].join('/') || '.';
+}
+
 class QmlInstance {
     constructor(config = {}) {
         const {
@@ -34,7 +68,10 @@ class QmlInstance {
         this._colorScheme = colorScheme;
 
         const modeConfig = buildModes[mode] || buildModes.static;
+        // Two forms of the same directory: _basePath is resolved against this
+        // module (import specifiers), _assetBase against the page (fetches).
         this._basePath = modeConfig.basePath;
+        this._assetBase = assetBaseFor(modeConfig.basePath);
         this._shared = modeConfig.shared;
 
         this.module = null;             // the emscripten module instance
@@ -53,6 +90,9 @@ class QmlInstance {
     }
 
     async _load() {
+        // Import specifiers resolve against this module, so they take the
+        // plain directory name; everything below is fetched by the page and
+        // takes _assetBase.
         const [{ qtLoad }, { qmlruntime_wasm_entry }] = await Promise.all([
             import(`./${this._basePath}/qtloader.js`),
             import(`./${this._basePath}/qmlruntime_wasm.js`),
@@ -68,13 +108,13 @@ class QmlInstance {
         };
 
         if (this._shared) {
-            qtConfig.qtdir = `${this._basePath}/qt`;
-            qtConfig.preload = [`${this._basePath}/qt_plugins.json`];
+            qtConfig.qtdir = `${this._assetBase}/qt`;
+            qtConfig.preload = [`${this._assetBase}/qt_plugins.json`];
         }
 
         const env = {};
         if (this._shared)
-            env.QML_IMPORT_PATH = `${this._basePath}/qt/qml`;
+            env.QML_IMPORT_PATH = `${this._assetBase}/qt/qml`;
         if (this.loggingRules)
             env.QT_LOGGING_RULES = this.loggingRules.split('\n').map(s => s.trim()).filter(Boolean).join(';');
         Object.assign(env, this._environment);
@@ -90,8 +130,8 @@ class QmlInstance {
             // list, which records basenames only; those live in qt/lib.
             locateFile: (path) => {
                 if (!path.endsWith('.so'))
-                    return `${this._basePath}/${path}`;
-                return path.includes('/') ? path : `${this._basePath}/qt/lib/${path}`;
+                    return `${this._assetBase}/${path}`;
+                return path.includes('/') ? path : `${this._assetBase}/qt/lib/${path}`;
             },
             qt: qtConfig,
         });
