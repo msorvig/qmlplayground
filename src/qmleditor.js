@@ -1,21 +1,33 @@
-// QmlEditor — CodeMirror-backed QML editor. Owns the CodeMirror instance,
-// the QML language mode, theme selection, and gutter/line markers for errors
-// and warnings. Emits 'change' on user edits (silent during setValue with
-// { silent: true }) and 'run' on Ctrl/Cmd+Enter.
+// QmlEditor — CodeMirror-backed QML editor shared by the playground and the
+// component viewer. Owns the CodeMirror instance, the QML language mode, theme
+// selection, and error/warning markers. Emits 'change' on user edits (silent
+// during setValue with { silent: true }) and 'run' on Ctrl/Cmd+Enter.
+//
+// Two modes, since the two front-ends want different chrome:
+//
+//   'full'     The playground's editor pane: line numbers, a gutter carrying
+//              error dots, bracket matching, Ctrl/Cmd+Enter to run.
+//   'snippet'  An inline sample in a doc page: no gutter, no line numbers,
+//              grows to fit its content, and reports errors by tinting the
+//              line plus a hover overlay (the host page has no gutter CSS).
+//
+// Individual options override the mode's defaults.
 
-// Load CodeMirror dynamically (single global script load)
+// Load CodeMirror once, as a global script. Resolved relative to this module
+// rather than the page, so it works from a page at any directory depth.
 async function loadCodeMirror() {
     if (typeof CodeMirror !== 'undefined') return;
     await new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = 'codemirror.min.js';
+        script.src = new URL('./codemirror.min.js', import.meta.url).href;
         script.onload = resolve;
         script.onerror = reject;
         document.head.appendChild(script);
     });
 }
 
-// Register QML mode for CodeMirror
+// Register QML mode for CodeMirror. Guarded so loading several editors on one
+// page is harmless.
 function registerQmlMode() {
     if (CodeMirror.modes.qml) return;
 
@@ -111,46 +123,145 @@ function cmThemeFor(resolvedTheme) {
     return resolvedTheme === 'light' ? 'default' : 'gruvbox-dark';
 }
 
+// Trim a leading/trailing blank line and strip common leading indentation, so
+// samples authored inside indented HTML display flush-left.
+function dedent(source) {
+    const lines = source.replace(/\t/g, '    ').split('\n');
+    while (lines.length && lines[0].trim() === '') lines.shift();
+    while (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
+    const indents = lines.filter(l => l.trim() !== '')
+                         .map(l => l.match(/^ */)[0].length);
+    const min = indents.length ? Math.min(...indents) : 0;
+    return lines.map(l => l.slice(min)).join('\n');
+}
+
+const editorModes = {
+    full: {
+        theme: 'dark',
+        lineNumbers: true,
+        gutter: true,
+        tooltip: 'gutter',
+        autoHeight: false,
+        autoCloseBrackets: true,
+        matchBrackets: true,
+        runKey: true,
+        dedent: false,
+    },
+    snippet: {
+        theme: 'light',
+        lineNumbers: false,
+        gutter: false,
+        tooltip: 'overlay',
+        autoHeight: true,
+        autoCloseBrackets: false,
+        matchBrackets: false,
+        runKey: false,
+        dedent: true,
+    },
+};
+
 class QmlEditor extends EventTarget {
-    constructor(textarea, options = {}) {
+    // `host` is either a <textarea> (replaced in place) or any element the
+    // editor is rendered into.
+    constructor(host, options = {}) {
         super();
-        this.textareaElement = textarea;
-        this._theme = options.theme ?? 'dark';
+        this.host = host;
+
+        const preset = editorModes[options.mode] ?? editorModes.full;
+        this._options = { ...preset, ...options };
+        this._theme = this._options.theme;
+
+        const source = this._options.source ?? '';
+        this._source = this._options.dedent ? dedent(source) : source;
+
         this.editor = null;
-        this._errorMarkers = [];
         this._silent = false;
+        this._markers = [];
+        this._lineErrors = new Map();   // lineIndex -> message, for the overlay
+        this._tooltip = null;
     }
 
     async init() {
         await loadCodeMirror();
         registerQmlMode();
 
-        this.editor = CodeMirror.fromTextArea(this.textareaElement, {
+        const o = this._options;
+        const cmOptions = {
             mode: 'qml',
             theme: cmThemeFor(this._theme),
-            lineNumbers: true,
-            gutters: ['CodeMirror-linenumbers', 'error-gutter'],
+            lineNumbers: o.lineNumbers,
             indentUnit: 4,
             tabSize: 4,
             indentWithTabs: false,
-            autoCloseBrackets: true,
-            matchBrackets: true,
-            extraKeys: {
+            autoCloseBrackets: o.autoCloseBrackets,
+            matchBrackets: o.matchBrackets,
+        };
+        if (o.gutter)
+            cmOptions.gutters = ['CodeMirror-linenumbers', 'error-gutter'];
+        if (o.autoHeight) {
+            // Render the whole document so CSS `height: auto` on .CodeMirror
+            // lets the editor grow to its content with no inner scrollbar.
+            cmOptions.viewportMargin = Infinity;
+        }
+        if (o.runKey) {
+            cmOptions.extraKeys = {
                 'Ctrl-Enter': () => this._emit('run'),
                 'Cmd-Enter': () => this._emit('run'),
-            }
-        });
+            };
+        }
+
+        if (this.host.tagName === 'TEXTAREA') {
+            if (this._source) this.host.value = this._source;
+            this.editor = CodeMirror.fromTextArea(this.host, cmOptions);
+        } else {
+            this.editor = CodeMirror(this.host, { ...cmOptions, value: this._source });
+        }
 
         this.editor.on('change', () => {
             if (this._silent) return;
             this._emit('change');
         });
 
+        if (o.tooltip === 'overlay')
+            this._initTooltip();
+
         this._emit('ready');
+        return this;
+    }
+
+    // A single tooltip element parented to <body> (so it escapes CodeMirror's
+    // overflow clip), shown while the pointer is over a tinted error line.
+    // Used in 'snippet' mode, where there is no gutter to hang a marker off
+    // and the host page supplies no tooltip styling.
+    _initTooltip() {
+        const tip = document.createElement('div');
+        tip.className = 'qmleditor-error-tooltip';
+        Object.assign(tip.style, {
+            position: 'fixed', zIndex: '2000', display: 'none',
+            maxWidth: '480px', padding: '6px 10px', borderRadius: '4px',
+            background: '#f4f4f4', color: '#222', border: '1px solid #d0d0d0',
+            font: '12px/1.4 -apple-system, "Helvetica Neue", Arial, sans-serif',
+            whiteSpace: 'pre-wrap', pointerEvents: 'none',
+            boxShadow: '0 2px 8px rgba(0,0,0,.15)',
+        });
+        document.body.appendChild(tip);
+        this._tooltip = tip;
+
+        const wrap = this.editor.getWrapperElement();
+        wrap.addEventListener('mousemove', (e) => {
+            const lineIndex = this.editor.lineAtHeight(e.clientY, 'client');
+            const message = this._lineErrors.get(lineIndex);
+            if (message == null) { tip.style.display = 'none'; return; }
+            tip.textContent = message;
+            tip.style.display = 'block';
+            tip.style.left = `${Math.min(e.clientX + 8, window.innerWidth - tip.offsetWidth - 8)}px`;
+            tip.style.top = `${e.clientY + 16}px`;
+        });
+        wrap.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
     }
 
     getValue() {
-        return this.editor?.getValue() ?? '';
+        return this.editor?.getValue() ?? this._source;
     }
 
     setValue(source, { silent = false } = {}) {
@@ -221,27 +332,51 @@ class QmlEditor extends EventTarget {
         this.editor?.setOption('theme', cmThemeFor(resolvedTheme));
     }
 
+    // Tear down: CodeMirror has no formal dispose, so drop the instance and
+    // empty the host element (removes the rendered editor DOM).
+    destroy() {
+        this.editor = null;
+        this._tooltip?.remove();
+        this._tooltip = null;
+        while (this.host.firstChild) this.host.removeChild(this.host.firstChild);
+    }
+
+    // Mark a 1-based line as carrying an error or warning: a full-width tinted
+    // bar, plus either a gutter dot whose CSS shows `message` on hover
+    // ('gutter') or a body-level overlay shown on hover ('overlay'). Lines off
+    // the document — e.g. an error mapped into a snippet's hidden preamble —
+    // are skipped.
     addMarker(line, column, message, type = 'error') {
         if (!this.editor || line <= 0) return;
         const lineIndex = line - 1;
-        const marker = document.createElement('div');
-        marker.className = type === 'warning' ? 'warning-marker' : 'error-marker';
-        marker.innerHTML = '●';
-        marker.setAttribute('data-tooltip', message);
-        this.editor.setGutterMarker(lineIndex, 'error-gutter', marker);
+        if (lineIndex > this.editor.lastLine()) return;
+
         const bgClass = type === 'warning' ? 'warning-line-bg' : 'error-line-bg';
         this.editor.addLineClass(lineIndex, 'background', bgClass);
-        this._errorMarkers.push({ line: lineIndex, type });
+
+        if (this._options.gutter) {
+            const marker = document.createElement('div');
+            marker.className = type === 'warning' ? 'warning-marker' : 'error-marker';
+            marker.innerHTML = '●';
+            marker.setAttribute('data-tooltip', message);
+            this.editor.setGutterMarker(lineIndex, 'error-gutter', marker);
+        }
+        if (this._options.tooltip === 'overlay')
+            this._lineErrors.set(lineIndex, message);
+
+        this._markers.push({ line: lineIndex, bgClass });
     }
 
     clearMarkers() {
         if (!this.editor) return;
-        for (const item of this._errorMarkers) {
-            this.editor.setGutterMarker(item.line, 'error-gutter', null);
-            this.editor.removeLineClass(item.line, 'background', 'error-line-bg');
-            this.editor.removeLineClass(item.line, 'background', 'warning-line-bg');
+        for (const m of this._markers) {
+            if (this._options.gutter)
+                this.editor.setGutterMarker(m.line, 'error-gutter', null);
+            this.editor.removeLineClass(m.line, 'background', m.bgClass);
         }
-        this._errorMarkers = [];
+        this._markers = [];
+        this._lineErrors.clear();
+        if (this._tooltip) this._tooltip.style.display = 'none';
     }
 
     _emit(type, detail = {}) {
@@ -254,4 +389,4 @@ class QmlEditor extends EventTarget {
     }
 }
 
-export { QmlEditor };
+export { QmlEditor, dedent };

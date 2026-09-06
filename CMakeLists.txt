@@ -121,14 +121,33 @@ if(EMSCRIPTEN)
         add_custom_command(TARGET deploy POST_BUILD
             COMMENT "Deploying web frontend"
 
+            # The source tree separates the shared core (src/) from the two
+            # front-ends (src/frontend/*), but everything is deployed flat to
+            # the dist root, beside static/ and shared/. Keeping the pages and
+            # the modules they import as siblings is what makes the relative
+            # asset paths resolve for both front-ends.
+
+            # Shared core
             COMMAND ${CMAKE_COMMAND} -E copy
-                ${CMAKE_SOURCE_DIR}/src/index.html
                 ${CMAKE_SOURCE_DIR}/src/qmlruntime.js
                 ${CMAKE_SOURCE_DIR}/src/qmleditor.js
                 ${CMAKE_SOURCE_DIR}/src/qmlproject.js
-                ${CMAKE_SOURCE_DIR}/src/qmlai.js
-                ${CMAKE_SOURCE_DIR}/src/qmlaiui.js
-                ${CMAKE_SOURCE_DIR}/src/qmlplayground.js
+                ${FRONTEND_DIR}/
+
+            # Front-end: the playground
+            COMMAND ${CMAKE_COMMAND} -E copy
+                ${CMAKE_SOURCE_DIR}/src/frontend/playground/index.html
+                ${CMAKE_SOURCE_DIR}/src/frontend/playground/qmlplayground.js
+                ${CMAKE_SOURCE_DIR}/src/frontend/playground/qmlai.js
+                ${CMAKE_SOURCE_DIR}/src/frontend/playground/qmlaiui.js
+                ${FRONTEND_DIR}/
+
+            # Front-end: the component viewer
+            COMMAND ${CMAKE_COMMAND} -E copy
+                ${CMAKE_SOURCE_DIR}/src/frontend/components/componentviewer.js
+                ${CMAKE_SOURCE_DIR}/src/frontend/components/catalog.html
+                ${CMAKE_SOURCE_DIR}/src/frontend/components/catalog.js
+                ${CMAKE_SOURCE_DIR}/src/frontend/components/components.html
                 ${FRONTEND_DIR}/
 
             COMMAND ${CMAKE_COMMAND} -E copy

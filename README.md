@@ -4,12 +4,31 @@ A browser-based QML editor and runtime powered by Qt for WebAssembly.
 
 **Try it:** [msorvig.github.io/qmlplayground](https://msorvig.github.io/qmlplayground/)
 
+## Two front-ends, one core
+
+The repository ships two web front-ends over a shared core:
+
+| | Entry page | What it is |
+|---|---|---|
+| **Playground** | `index.html` | Full-window IDE: editor pane, live preview, console, examples, settings |
+| **Component viewer** | `catalog.html`, `components.html` | Inline live previews embedded next to code samples in a doc-style page |
+
+Both are built on the same three shared modules — `qmlruntime.js`
+(`QmlInstance` / `QmlRuntime`), `qmleditor.js` (`QmlEditor`) and
+`qmlproject.js` (`QmlProject`). There is one wasm binary and one build for
+both.
+
+In the source tree the shared modules live in `src/` and each front-end has
+its own directory under `src/frontend/`. The build deploys everything flat
+into `dist/`, so the pages and the modules they import end up as siblings.
+
 ## Features
 
 - Live QML editing with syntax highlighting
 - Auto-run on code changes
 - Error and warning display with line markers
 - Built-in examples for QtQuick, QtQuick Controls, Qt Quick 3D, and Qt Graphs
+- Embeddable live previews for documentation pages
 
 ## Quick Start
 
@@ -67,6 +86,68 @@ await playground.init();
 | `success` | - | QML loaded successfully |
 | `examplesloaded` | `{ examples }` | Examples index loaded |
 | `exampleloaded` | `{ example, source }` | Example file loaded |
+
+### QmlComponentViewer
+
+The other front-end: instead of one full-window editor, it puts many small
+live previews inline in a host page, each next to the sample that produced it.
+`catalog.html` (a Qt Quick Controls catalog) and `components.html` (a Slider
+page) are the two demos.
+
+A sample is authored in two parts: the *preamble* (imports the runtime needs,
+which the reader doesn't care about) and the *sample* (the snippet on show).
+The preview runs `preamble + sample`; the editor displays only the sample, and
+error lines are mapped back by subtracting the preamble's line count.
+
+```javascript
+import { QmlComponentViewer } from './componentviewer.js';
+
+const viewer = new QmlComponentViewer({
+    preamble: 'import QtQuick\nimport QtQuick.Controls',
+    instancing: 'shared',
+});
+await viewer.scanAndAttach();       // scans the page for .example blocks
+await viewer.setStyle('Material');  // relaunches every preview
+viewer.setColorScheme('dark');
+```
+
+`scanAndAttach()` looks for `.example` blocks, each holding a `.code` element
+whose text *is* the sample and an empty `.preview` element for the runtime:
+
+```html
+<div class="example">
+    <pre class="code">Button { text: "Hi" }</pre>
+    <div class="preview" data-fill="width"></div>
+</div>
+```
+
+#### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `mode` | `'static'` | Build mode, as for `QmlRuntime` |
+| `preamble` | `''` | QML prepended to every sample on the page |
+| `style` | `''` | Quick Controls style for every preview (`''` = the build default) |
+| `instancing` | `'isolated'` | `'isolated'`: one wasm instance per preview, so each can have its own Controls style. `'shared'`: one instance hosts all previews — lighter, but one style for the page |
+| `colorScheme` | `'light'` | `'light'`, `'dark'` or `'auto'` for the previews. The editors stay light |
+
+The wasm is fetched and compiled once per viewer and every preview
+instantiates from that one compiled module, so a page with twenty previews
+still compiles the binary a single time.
+
+#### Methods
+
+| Method | Description |
+|--------|-------------|
+| `addPreview(container, options)` | Create one preview. `options`: `qml` or `preamble`/`sample`, `codeHost`, `fill` (`'none'`/`'width'`/`'height'`/`'both'`), `id` |
+| `scanAndAttach(root?, options?)` | Instantiate every `.example` block under `root`. Returns the `Preview` handles in DOM order |
+| `previews()` / `removePreview(id)` | Inspect / tear down |
+| `setStyle(style)` | Change the Quick Controls style. Relaunches every preview (the style is baked into the wasm environment at load), reusing the compiled module and preserving edits |
+| `setColorScheme(scheme)` | Change the previews' color scheme live |
+
+Note that `setColorScheme` reliably affects previews created *after* the call:
+Qt reads the forced scheme when items are built, so already-running previews
+may keep their original styling until they are recreated.
 
 ### QmlRuntime
 
@@ -157,10 +238,9 @@ plugins have loaded and types are resolved.
 
 ### QmlEditor
 
-CodeMirror-backed QML editor extracted from `QmlPlayground`. Owns the
-CodeMirror instance, the QML language mode, theme selection, and error /
-warning gutter markers. Useful if you want a QML editor without the full
-playground chrome.
+CodeMirror-backed QML editor shared by both front-ends. Owns the CodeMirror
+instance, the QML language mode, theme selection, and error / warning markers.
+Useful on its own if you want a QML editor without the full playground chrome.
 
 ```javascript
 import { QmlEditor } from './qmleditor.js';
@@ -176,17 +256,45 @@ editor.setTheme('light');
 editor.addMarker(7, 12, 'unknown property', 'warning');
 ```
 
+#### Modes
+
+The two front-ends want different chrome, so the editor has two modes. Pass
+`mode` to pick one; individual options override the mode's defaults.
+
+```javascript
+// The playground's editor pane (the default).
+new QmlEditor(textarea, { mode: 'full' });
+
+// An inline sample in a doc page.
+new QmlEditor(div, { mode: 'snippet', source: 'Button { text: "Hi" }' });
+```
+
+| | `full` | `snippet` |
+|---|---|---|
+| Host element | a `<textarea>`, replaced in place | any element, rendered into |
+| Line numbers | yes | no |
+| Gutter | `error-gutter`, carries error dots | none |
+| Height | fills its container | grows to fit the content |
+| Bracket close / match | yes | no |
+| Ctrl/Cmd+Enter → `run` | yes | no |
+| Error display | gutter dot; the host page's CSS shows `data-tooltip` on hover | line tint; a `<body>`-level overlay shows the message on hover |
+| Initial `source` | used as-is | dedented first |
+
+`snippet` mode reports errors with its own overlay because a doc page has no
+gutter to hang a marker off and supplies no tooltip styling of its own.
+
 #### Methods
 
 | Method | Description |
 |--------|-------------|
-| `init()` | Async: load CodeMirror, register the QML mode, instantiate |
+| `init()` | Async: load CodeMirror, register the QML mode, instantiate. Returns the editor |
 | `getValue()` / `setValue(s, { silent? })` | Read / write content. `{ silent: true }` skips the `change` event |
 | `focus()` / `hasFocus()` | Focus management |
 | `refresh()` | Force a CodeMirror layout recalc |
 | `setTheme('dark' \| 'light')` | Swap the CodeMirror theme to match the host UI |
-| `addMarker(line, column, message, type)` | Place an error / warning marker on a line |
+| `addMarker(line, column, message, type)` | Place an error / warning marker on a line. Lines past the end of the document are ignored |
 | `clearMarkers()` | Remove all markers |
+| `destroy()` | Drop the CodeMirror instance and empty the host element |
 
 #### Events
 
@@ -295,9 +403,16 @@ cmake --build build-wasm-shared --target deploy
 
 ### Deploy layout
 
+Both front-ends' pages sit at the dist root, beside `static/` and `shared/`,
+so asset paths resolve the same way for either one.
+
 ```
 dist/
-  index.html              Web frontend
+  index.html              Playground front-end
+  catalog.html            Component viewer: Qt Quick Controls catalog
+  catalog.js
+  components.html         Component viewer: Slider page
+  componentviewer.js
   qmlplayground.js
   qmleditor.js
   qmlproject.js
@@ -329,14 +444,26 @@ build.sh                Top-level build script for both variants
 cmake/
   patch_esm.cmake       qtloader.js ES module patching script
 src/
-  index.html            Demo page
   main.cpp              C++ entry point
-  qmlplayground.js      QmlPlayground component
-  qmleditor.js          QmlEditor (CodeMirror wrapper)
-  qmlproject.js         QmlProject (multi-file QML project model)
-  qmlruntime.js         QmlRuntime component
   qmlruntime.cpp/h      QmlRuntime C++ source
   imports.qml           QML imports for static linking
+
+  qmlruntime.js         Shared core: QmlInstance / QmlRuntime
+  qmleditor.js          Shared core: QmlEditor (CodeMirror wrapper)
+  qmlproject.js         Shared core: QmlProject (multi-file model)
+
+  frontend/
+    playground/         The playground
+      index.html
+      qmlplayground.js
+      qmlai.js
+      qmlaiui.js
+    components/         The component viewer
+      catalog.html      Qt Quick Controls catalog
+      catalog.js
+      components.html   Slider page
+      componentviewer.js
+
   qt.conf               Qt prefix config for shared builds
   qt_plugins.json       Platform plugin preload for shared builds
 3rdparty/
