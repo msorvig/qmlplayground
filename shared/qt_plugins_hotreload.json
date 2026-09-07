@@ -1,0 +1,10 @@
+[
+  {
+    "source": "$QTDIR/plugins/qmltooling/libqmldbg_native.so",
+    "destination": "/qt/plugins/qmltooling/libqmldbg_native.so"
+  },
+  {
+    "source": "$QTDIR/plugins/qmltooling/libqmldbg_preview.so",
+    "destination": "/qt/plugins/qmltooling/libqmldbg_preview.so"
+  }
+]

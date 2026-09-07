@@ -1,0 +1,10 @@
+module QtGraphs2D.impl
+linktarget Qt6::qtgraphs2dimplplugin
+optional plugin qtgraphs2dimplplugin
+classname QtGraphs2DimplPlugin
+typeinfo Graphs2DImpl.qmltypes
+prefer :/qt-project.org/imports/QtGraphs2D/impl/
+PointMarker 6.0 PointMarker.qml
+ZoomAreaDelegate 6.0 ZoomAreaDelegate.qml
+depends QtQuick
+

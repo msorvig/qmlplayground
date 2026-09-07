@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>QML Component Viewer — Slider</title>
+    <link rel="stylesheet" href="codemirror.min.css">
+    <style>
+        body {
+            font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+            max-width: 880px;
+            margin: 2em auto;
+            padding: 0 1em;
+            color: #222;
+            line-height: 1.5;
+        }
+        h1 { font-weight: 600; }
+        h2 { margin-top: 2em; font-weight: 600; }
+        .toolbar {
+            position: sticky;
+            top: 0;
+            display: flex;
+            align-items: center;
+            gap: .5em;
+            padding: .6em 0;
+            margin-bottom: 1em;
+            background: rgba(255, 255, 255, .92);
+            backdrop-filter: blur(4px);
+            border-bottom: 1px solid #eee;
+            z-index: 10;
+        }
+        .toolbar label { font-size: 13px; color: #555; }
+        .toolbar select { font-size: 13px; padding: 2px 4px; }
+        .example {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 1em;
+            /* Both columns share the row height. The row is sized by the
+               code box (auto height = its text), and the preview stretches
+               to match, so the preview tracks the code. */
+            align-items: stretch;
+            margin: 1em 0 2em;
+        }
+        .code {
+            margin: 0;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            font-size: 13px;
+            /* Pre-JS fallback styling; replaced by CodeMirror on load. */
+            background: #f6f6f6;
+            padding: 0;
+        }
+        /* Read-only viewer grows to its content (no inner scrollbar). */
+        .code .CodeMirror {
+            height: auto;
+            background: #f6f6f6;
+        }
+        /* Breathing room above the first line and below the last. */
+        .code .CodeMirror-lines {
+            padding: 12px 0;
+        }
+
+        /* Full-width tint over the offending line; hover shows the message
+           (native tooltip on the line text). */
+        .error-line-bg   { background: rgba(229, 72, 77, 0.16) !important; }
+        .warning-line-bg { background: rgba(204, 167, 0, 0.18) !important; }
+        .preview {
+            box-sizing: border-box;
+            width: 320px;
+            /* No fixed height: tracks the code box via the grid row. */
+            position: relative;
+            overflow: hidden;
+            min-height: 120px;   /* keep usable if a sample is very short */
+            border: 1px solid #d0d0d0;
+            border-radius: 4px;
+            background: #fff;    /* shows as the gap around the content */
+        }
+    </style>
+</head>
+<body>
+
+<h1>Slider</h1>
+<p>
+    Live preview of <code>QtQuick.Controls.Slider</code>.
+</p>
+
+<div class="toolbar">
+    <label for="style-select">Style:</label>
+    <select id="style-select">
+        <option value="Default">Default</option>
+        <option value="Basic">Basic</option>
+        <option value="Fusion">Fusion</option>
+        <option value="Material">Material</option>
+        <option value="Universal">Universal</option>
+    </select>
+</div>
+
+<h2>Default Slider</h2>
+<div class="example">
+    <pre class="code">Slider {
+    width: 200
+    value: 0.5
+}</pre>
+    <div class="preview"></div>
+</div>
+
+<h2>Slider with step size</h2>
+<div class="example">
+    <pre class="code">Slider {
+    width: 240
+    from: 0
+    to: 100
+    stepSize: 5
+    snapMode: Slider.SnapAlways
+    value: 40
+}</pre>
+    <div class="preview"></div>
+</div>
+
+<h2>Vertical slider</h2>
+<div class="example">
+    <pre class="code">Slider {
+    height: 160
+    orientation: Qt.Vertical
+    value: 0.7
+}</pre>
+    <div class="preview"></div>
+</div>
+
+<script type="module">
+    import { QmlComponentViewer } from './componentviewer.js';
+
+    // This page shows QtQuick.Controls samples, so it supplies the matching
+    // imports as the shared preamble. The samples on the page stay clean.
+    const viewer = new QmlComponentViewer({
+        preamble: 'import QtQuick\nimport QtQuick.Controls',
+    });
+    await viewer.scanAndAttach();
+    console.log(`Attached ${viewer.previews().length} previews`);
+
+    // Global style selector: changing it relaunches every preview with the
+    // chosen Quick Controls style.
+    const select = document.getElementById('style-select');
+    select.addEventListener('change', async () => {
+        select.disabled = true;
+        await viewer.setStyle(select.value);
+        select.disabled = false;
+    });
+</script>
+
+</body>
+</html>

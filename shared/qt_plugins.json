@@ -1,0 +1,10 @@
+[
+  {
+    "source": "$QTDIR/plugins/platforms/libqwasm.so",
+    "destination": "/qt/plugins/platforms/libqwasm.so"
+  },
+  {
+    "source": "$QTDIR/../qt.conf",
+    "destination": "/qt.conf"
+  }
+]

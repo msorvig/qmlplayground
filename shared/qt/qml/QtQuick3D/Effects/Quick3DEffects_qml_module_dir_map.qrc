@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/qt-project.org/imports/QtQuick3D/Effects">/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase/qml/QtQuick3D/Effects</file>
+
+  </qresource>
+</RCC>

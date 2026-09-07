@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/qt-project.org/imports/QtGraphs2D/impl">/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase/qml/QtGraphs2D/impl</file>
+
+  </qresource>
+</RCC>

@@ -1,0 +1,588 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="../"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>QmlRuntime | QML Playground JS API</title><meta name="description" content="Documentation for QML Playground JS API"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/icons.js" id="tsd-icons-script"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container"><a href="../index.html" class="title">QML Playground JS API</a>
+<div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/>
+<ul role="listbox" id="tsd-search-results"></ul>
+<div id="tsd-search-status" aria-live="polite" aria-atomic="true">
+<div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-menu"></use></svg></a></div></header>
+<div class="container container-main">
+<div class="col-content">
+<div class="tsd-page-title">
+<ul class="tsd-breadcrumb" aria-label="Breadcrumb">
+<li><a href="../modules/qmlruntime.html">qmlruntime</a></li>
+<li><a href="" aria-current="page">QmlRuntime</a></li></ul>
+<h1>Class QmlRuntime</h1></div>
+<section class="tsd-panel tsd-comment">
+<div class="tsd-comment tsd-typography"><p>QmlRuntime provides a QML view rendered into a DOM element. Add it to the
+html document by passing a parent element to its constructor.</p>
+<pre><code class="js"><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">runtime</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">QmlRuntime</span><span class="hl-1">(</span><span class="hl-4">document</span><span class="hl-1">.</span><span class="hl-3">getElementById</span><span class="hl-1">(</span><span class="hl-5">&#39;preview&#39;</span><span class="hl-1">));</span><br/><span class="hl-4">runtime</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-5">&#39;ready&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-4">runtime</span><span class="hl-1">.</span><span class="hl-3">loadQml</span><span class="hl-1">(</span><span class="hl-5">&#39;import QtQuick</span><span class="hl-8">\n</span><span class="hl-5">Rectangle { color: &quot;red&quot; }&#39;</span><span class="hl-1">));</span><br/><span class="hl-6">await</span><span class="hl-1"> </span><span class="hl-4">runtime</span><span class="hl-1">.</span><span class="hl-3">load</span><span class="hl-1">();</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Pass a <a href="../types/qmlruntime.QmlRuntimeConfig.html" class="tsd-kind-type-alias">config object</a> to QmlRuntime to set config
+options. Config options include setting the build mode (static or shared
+libraries), the Qt Quick Controls style, and options for enabling
+accessibility and hot reloading support.</p>
+<pre><code class="js"><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">runtime</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">QmlRuntime</span><span class="hl-1">(</span><span class="hl-4">container</span><span class="hl-1">, {</span><br/><span class="hl-1">    </span><span class="hl-4">mode:</span><span class="hl-1"> </span><span class="hl-5">&#39;shared&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-4">controlsStyle:</span><span class="hl-1"> </span><span class="hl-5">&#39;Material&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-4">accessibility:</span><span class="hl-1"> </span><span class="hl-0">true</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-4">hotReload:</span><span class="hl-1"> </span><span class="hl-0">true</span><span class="hl-1">,</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Every option is also a property of the same name and can be changed at any
+time. <code>colorScheme</code>, <code>fillWidth</code>, <code>fillHeight</code>, <code>resizeEnabled</code> and
+<code>hotReload</code> apply immediately. <code>mode</code>, <code>module</code>, <code>environment</code>,
+<code>loggingRules</code>, <code>controlsStyle</code> and <code>accessibility</code> need a new Qt process:
+the runtime recreates its instance, emits <code>loading</code> and <code>ready</code> again and
+re-runs the last loaded QML. Changes made in one go cause one reload, and
+<a href="#load" class="tsd-kind-method">load</a> returns the promise of the reload in flight.</p>
+<pre><code class="js"><span class="hl-4">runtime</span><span class="hl-1">.</span><span class="hl-4">controlsStyle</span><span class="hl-1"> = </span><span class="hl-5">&#39;Fusion&#39;</span><span class="hl-1">;</span><br/><span class="hl-4">runtime</span><span class="hl-1">.</span><span class="hl-4">mode</span><span class="hl-1"> = </span><span class="hl-5">&#39;shared&#39;</span><span class="hl-1">;</span><br/><span class="hl-6">await</span><span class="hl-1"> </span><span class="hl-4">runtime</span><span class="hl-1">.</span><span class="hl-3">load</span><span class="hl-1">();   </span><span class="hl-9">// one reload; the previous QML is running again</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Each QmlRuntime runs on a <a href="qmlruntime.QmlInstance.html" class="tsd-kind-class">QmlInstance</a>, which manages the
+WebAssembly instance, through a <a href="qmlruntime.QmlViewer.html" class="tsd-kind-class">QmlViewer</a>. Use those two directly
+to run several views on one instance.</p>
+<p>QmlRuntime provides events for reacting to load state and QML compiler
+warnings and errors. Connect to each event using the
+<a href="#on" class="tsd-kind-method">on</a> method, which passes the event's <code>detail</code> to the
+callback.</p>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Detail</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>loading</code></td>
+<td>none</td>
+<td>A load or reload started</td>
+</tr>
+<tr>
+<td><code>ready</code></td>
+<td><a href="../interfaces/qmlruntime.QmlReady.html" class="tsd-kind-interface">QmlReady</a></td>
+<td>The view can load QML</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td><a href="../interfaces/qmlruntime.QmlIssue.html" class="tsd-kind-interface">QmlIssue</a></td>
+<td>A QML error, or a load failed</td>
+</tr>
+<tr>
+<td><code>warning</code></td>
+<td><a href="../interfaces/qmlruntime.QmlIssue.html" class="tsd-kind-interface">QmlIssue</a></td>
+<td>A QML warning</td>
+</tr>
+<tr>
+<td><code>qmlloaded</code></td>
+<td><a href="../interfaces/qmlruntime.QmlLoaded.html" class="tsd-kind-interface">QmlLoaded</a></td>
+<td>A load finished, with or without errors; see <a href="#geterrors" class="tsd-kind-method">getErrors</a></td>
+</tr>
+</tbody>
+</table>
+<p>A handler for each event:</p>
+<pre><code class="js"><span class="hl-4">runtime</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-5">&#39;loading&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-4">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-5">&#39;loading Qt&#39;</span><span class="hl-1">))</span><br/><span class="hl-1">       .</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-5">&#39;ready&#39;</span><span class="hl-1">, ({ </span><span class="hl-4">loadTime</span><span class="hl-1">, </span><span class="hl-4">qtVersion</span><span class="hl-1"> }) </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-4">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-5">`Qt </span><span class="hl-0">${</span><span class="hl-4">qtVersion</span><span class="hl-0">}</span><span class="hl-5"> ready in </span><span class="hl-0">${</span><span class="hl-4">loadTime</span><span class="hl-0">}</span><span class="hl-5"> ms`</span><span class="hl-1">))</span><br/><span class="hl-1">       .</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-5">&#39;error&#39;</span><span class="hl-1">, ({ </span><span class="hl-4">line</span><span class="hl-1">, </span><span class="hl-4">column</span><span class="hl-1">, </span><span class="hl-4">message</span><span class="hl-1"> }) </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-4">console</span><span class="hl-1">.</span><span class="hl-3">error</span><span class="hl-1">(</span><span class="hl-5">`</span><span class="hl-0">${</span><span class="hl-4">line</span><span class="hl-0">}</span><span class="hl-5">:</span><span class="hl-0">${</span><span class="hl-4">column</span><span class="hl-0">}</span><span class="hl-5">: </span><span class="hl-0">${</span><span class="hl-4">message</span><span class="hl-0">}</span><span class="hl-5">`</span><span class="hl-1">))</span><br/><span class="hl-1">       .</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-5">&#39;warning&#39;</span><span class="hl-1">, ({ </span><span class="hl-4">line</span><span class="hl-1">, </span><span class="hl-4">column</span><span class="hl-1">, </span><span class="hl-4">message</span><span class="hl-1"> }) </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-4">console</span><span class="hl-1">.</span><span class="hl-3">warn</span><span class="hl-1">(</span><span class="hl-5">`</span><span class="hl-0">${</span><span class="hl-4">line</span><span class="hl-0">}</span><span class="hl-5">:</span><span class="hl-0">${</span><span class="hl-4">column</span><span class="hl-0">}</span><span class="hl-5">: </span><span class="hl-0">${</span><span class="hl-4">message</span><span class="hl-0">}</span><span class="hl-5">`</span><span class="hl-1">))</span><br/><span class="hl-1">       .</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-5">&#39;qmlloaded&#39;</span><span class="hl-1">, ({ </span><span class="hl-4">hot</span><span class="hl-1"> }) </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-4">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">hot</span><span class="hl-1"> ? </span><span class="hl-5">&#39;hot reloaded&#39;</span><span class="hl-1"> : </span><span class="hl-5">&#39;loaded&#39;</span><span class="hl-1">, </span><span class="hl-4">runtime</span><span class="hl-1">.</span><span class="hl-3">getErrors</span><span class="hl-1">()));</span>
+</code><button type="button">Copy</button></pre>
+
+</div></section>
+<section class="tsd-panel tsd-hierarchy" data-refl="241">
+<h4>Hierarchy</h4>
+<ul class="tsd-hierarchy">
+<li class="tsd-hierarchy-item"><span class="tsd-signature-type">EventTarget</span>
+<ul class="tsd-hierarchy">
+<li class="tsd-hierarchy-item"><span class="tsd-hierarchy-target">QmlRuntime</span></li></ul></li></ul></section><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L917">qmlruntime.js:917</a></li></ul></aside>
+<section class="tsd-panel-group tsd-index-group">
+<section class="tsd-panel tsd-index-panel">
+<details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h5 class="tsd-index-heading uppercase">Index</h5></summary>
+<div class="tsd-accordion-details">
+<section class="tsd-index-section">
+<h3 class="tsd-index-heading tsd-anchor-link" id="constructors">Constructors<a href="#constructors" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-index-list"><a href="#constructor" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Constructor"><use href="../assets/icons.svg#icon-512"></use></svg><span>constructor</span></a>
+</div></section>
+<section class="tsd-index-section">
+<h3 class="tsd-index-heading tsd-anchor-link" id="accessors">Accessors<a href="#accessors" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-index-list"><a href="#accessibility" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>accessibility</span></a>
+<a href="#colorscheme" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>color<wbr/>Scheme</span></a>
+<a href="#container" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>container</span></a>
+<a href="#controlsstyle" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>controls<wbr/>Style</span></a>
+<a href="#environment" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>environment</span></a>
+<a href="#fillheight" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>fill<wbr/>Height</span></a>
+<a href="#fillwidth" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>fill<wbr/>Width</span></a>
+<a href="#hotreload" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>hot<wbr/>Reload</span></a>
+<a href="#hotreloadavailable" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>hot<wbr/>Reload<wbr/>Available</span></a>
+<a href="#instance" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>instance</span></a>
+<a href="#loggingrules" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>logging<wbr/>Rules</span></a>
+<a href="#mode" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>mode</span></a>
+<a href="#module" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>module</span></a>
+<a href="#qtversion" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>qt<wbr/>Version</span></a>
+<a href="#ready" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>ready</span></a>
+<a href="#resizeenabled" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>resize<wbr/>Enabled</span></a>
+<a href="#viewer" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>viewer</span></a>
+</div></section>
+<section class="tsd-index-section">
+<h3 class="tsd-index-heading tsd-anchor-link" id="methods">Methods<a href="#methods" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-index-list"><a href="#clear" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>clear</span></a>
+<a href="#destroy" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>destroy</span></a>
+<a href="#geterrors" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Errors</span></a>
+<a href="#load" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>load</span></a>
+<a href="#loadproject" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>load<wbr/>Project</span></a>
+<a href="#loadqml" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>load<wbr/>Qml</span></a>
+<a href="#on" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>on</span></a>
+</div></section></div></details></section></section>
+<details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Constructors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h2 class="tsd-anchor-link" id="constructors-1">Constructors<a href="#constructors-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
+<section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="constructor"><span>constructor</span><a href="#constructor" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="constructorqmlruntime"><span class="tsd-signature-keyword">new</span> <span class="tsd-kind-constructor-signature">QmlRuntime</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">container</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">HTMLElement</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">config</span><span class="tsd-signature-symbol">?:</span> <a href="../types/qmlruntime.QmlRuntimeConfig.html" class="tsd-signature-type tsd-kind-type-alias">QmlRuntimeConfig</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="" class="tsd-signature-type tsd-kind-class">QmlRuntime</a><a href="#constructorqmlruntime" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">container</span>: <span class="tsd-signature-type">HTMLElement</span></span>
+<div class="tsd-comment tsd-typography"><p>Element the view renders into.</p>
+</div></li>
+<li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">config</span>: <a href="../types/qmlruntime.QmlRuntimeConfig.html" class="tsd-signature-type tsd-kind-type-alias">QmlRuntimeConfig</a><span class="tsd-signature-symbol"> = {}</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <a href="" class="tsd-signature-type tsd-kind-class">QmlRuntime</a></h4><aside class="tsd-sources">
+<p>Overrides EventTarget.constructor</p>
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L922">qmlruntime.js:922</a></li></ul></aside></div></li></ul></section></section></details>
+<details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Accessors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h2 class="tsd-anchor-link" id="accessors-1">Accessors<a href="#accessors-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
+<section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="accessibility"><span>accessibility</span><a href="#accessibility" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="accessibilityaccessibility"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">accessibility</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Expose the scene to screen readers. A change reloads.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L988">qmlruntime.js:988</a></li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="accessibilityaccessibility-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">accessibility</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">on</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">on</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L989">qmlruntime.js:989</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="colorscheme"><span>color<wbr/>Scheme</span><a href="#colorscheme" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="colorschemecolorscheme"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">colorScheme</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;light&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;dark&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;auto&quot;</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Forced color scheme. <code>auto</code> or empty follows the system.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">&quot;&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;light&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;dark&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;auto&quot;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1000">qmlruntime.js:1000</a></li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="colorschemecolorscheme-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">colorScheme</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">scheme</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;light&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;dark&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;auto&quot;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">scheme</span>: <span class="tsd-signature-type">&quot;&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;light&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;dark&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;auto&quot;</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1001">qmlruntime.js:1001</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="container"><span>container</span><a href="#container" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="containercontainer"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">container</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">HTMLElement</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Element the view renders into.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">HTMLElement</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L948">qmlruntime.js:948</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="controlsstyle"><span>controls<wbr/>Style</span><a href="#controlsstyle" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="controlsstylecontrolsstyle"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">controlsStyle</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Qt Quick Controls style. Empty for the build's default. A change reloads.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L984">qmlruntime.js:984</a></li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="controlsstylecontrolsstyle-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">controlsStyle</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">style</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">style</span>: <span class="tsd-signature-type">string</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L985">qmlruntime.js:985</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="environment"><span>environment</span><a href="#environment" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="environmentenvironment"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">environment</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Environment variables for the Qt process. A change reloads.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L976">qmlruntime.js:976</a></li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="environmentenvironment-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">environment</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">environment</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">environment</span>: <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L977">qmlruntime.js:977</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="fillheight"><span>fill<wbr/>Height</span><a href="#fillheight" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="fillheightfillheight"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">fillHeight</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Same as <a href="#fillwidth" class="tsd-kind-accessor">fillWidth</a>, for the height.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1014">qmlruntime.js:1014</a></li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="fillheightfillheight-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">fillHeight</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">fill</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">fill</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1015">qmlruntime.js:1015</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="fillwidth"><span>fill<wbr/>Width</span><a href="#fillwidth" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="fillwidthfillwidth"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">fillWidth</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Stretch the root item to the window width; otherwise keep its implicit width and center it.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1007">qmlruntime.js:1007</a></li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="fillwidthfillwidth-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">fillWidth</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">fill</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">fill</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1008">qmlruntime.js:1008</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="hotreload"><span>hot<wbr/>Reload</span><a href="#hotreload" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="hotreloadhotreload"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">hotReload</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Patch the running scene in place in <a href="#loadproject" class="tsd-kind-method">loadProject</a> when only file
+contents changed. Turning it on reloads if the instance was started
+without the QmlPreview service.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1033">qmlruntime.js:1033</a></li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="hotreloadhotreload-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">hotReload</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">on</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">on</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1034">qmlruntime.js:1034</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="hotreloadavailable"><span>hot<wbr/>Reload<wbr/>Available</span><a href="#hotreloadavailable" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="hotreloadavailablehotreloadavailable"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">hotReloadAvailable</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p><code>true</code> when the instance's QmlPreview service accepts in-place updates.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L963">qmlruntime.js:963</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="instance"><span>instance</span><a href="#instance" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="instanceinstance"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">instance</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <a href="qmlruntime.QmlInstance.html" class="tsd-signature-type tsd-kind-class">QmlInstance</a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>The current instance. <code>null</code> before <a href="#load" class="tsd-kind-method">load</a> and while reloading.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <a href="qmlruntime.QmlInstance.html" class="tsd-signature-type tsd-kind-class">QmlInstance</a></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L951">qmlruntime.js:951</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="loggingrules"><span>logging<wbr/>Rules</span><a href="#loggingrules" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="loggingrulesloggingrules"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">loggingRules</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Qt logging rules, one per line. A change reloads.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L980">qmlruntime.js:980</a></li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="loggingrulesloggingrules-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">loggingRules</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">rules</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">rules</span>: <span class="tsd-signature-type">string</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L981">qmlruntime.js:981</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="mode"><span>mode</span><a href="#mode" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="modemode"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">mode</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;static&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;shared&quot;</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Build mode. A change reloads.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">&quot;static&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;shared&quot;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L968">qmlruntime.js:968</a></li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="modemode-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">mode</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">mode</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;static&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;shared&quot;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">mode</span>: <span class="tsd-signature-type">&quot;static&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;shared&quot;</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L969">qmlruntime.js:969</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="module"><span>module</span><a href="#module" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="modulemodule"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">module</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Module</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">Module</span><span class="tsd-signature-symbol">&gt;</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Pre-compiled main module, or <code>null</code> to fetch and compile on load. A change reloads.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Module</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">Module</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L972">qmlruntime.js:972</a></li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="modulemodule-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">module</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">module</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Module</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">Module</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">module</span>: <span class="tsd-signature-type">Module</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">Module</span><span class="tsd-signature-symbol">&gt;</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L973">qmlruntime.js:973</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="qtversion"><span>qt<wbr/>Version</span><a href="#qtversion" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="qtversionqtversion"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">qtVersion</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Version of the loaded Qt. Empty until ready.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L960">qmlruntime.js:960</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="ready"><span>ready</span><a href="#ready" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="readyready"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">ready</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p><code>true</code> while the view can load QML: after <a href="#load" class="tsd-kind-method">load</a>, except during a reload.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L957">qmlruntime.js:957</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="resizeenabled"><span>resize<wbr/>Enabled</span><a href="#resizeenabled" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="resizeenabledresizeenabled"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">resizeEnabled</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Forward container size changes to Qt; see <a href="qmlruntime.QmlViewer.html#resizeenabled" class="tsd-kind-accessor">QmlViewer.resizeEnabled</a>.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1021">qmlruntime.js:1021</a></li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="resizeenabledresizeenabled-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">resizeEnabled</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">enabled</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">enabled</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1022">qmlruntime.js:1022</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="viewer"><span>viewer</span><a href="#viewer" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="viewerviewer"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">viewer</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <a href="qmlruntime.QmlViewer.html" class="tsd-signature-type tsd-kind-class">QmlViewer</a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>The current viewer. <code>null</code> before <a href="#load" class="tsd-kind-method">load</a> and while reloading.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <a href="qmlruntime.QmlViewer.html" class="tsd-signature-type tsd-kind-class">QmlViewer</a></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L954">qmlruntime.js:954</a></li></ul></aside></div></li></ul></section></section></details>
+<details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h2 class="tsd-anchor-link" id="methods-1">Methods<a href="#methods-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
+<section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="clear"><span>clear</span><a href="#clear" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="clear-1"><span class="tsd-kind-call-signature">clear</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#clear-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Removes the loaded scene.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1098">qmlruntime.js:1098</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="destroy"><span>destroy</span><a href="#destroy" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="destroy-1"><span class="tsd-kind-call-signature">destroy</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#destroy-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Destroys the runtime: the view, its project files and the instance.
+<a href="#container" class="tsd-kind-accessor">container</a> is emptied.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1058">qmlruntime.js:1058</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="geterrors"><span>get<wbr/>Errors</span><a href="#geterrors" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="geterrors-1"><span class="tsd-kind-call-signature">getErrors</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/qmlruntime.QmlIssue.html" class="tsd-signature-type tsd-kind-interface">QmlIssue</a><span class="tsd-signature-symbol">[]</span><a href="#geterrors-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Returns the errors and warnings of the last load. Empty when not ready.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <a href="../interfaces/qmlruntime.QmlIssue.html" class="tsd-signature-type tsd-kind-interface">QmlIssue</a><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1095">qmlruntime.js:1095</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="load"><span>load</span><a href="#load" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="load-1"><span class="tsd-kind-call-signature">load</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#load-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Loads the runtime, or returns the promise of the load or reload in
+flight. Emits <code>loading</code> first and <code>ready</code> on success. On failure emits
+<code>error</code> and rejects.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1048">qmlruntime.js:1048</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="loadproject"><span>load<wbr/>Project</span><a href="#loadproject" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="loadproject-1"><span class="tsd-kind-call-signature">loadProject</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">project</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">QmlProject</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#loadproject-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Loads a project, in place when hot reload applies; see
+<a href="qmlruntime.QmlViewer.html#loadproject" class="tsd-kind-method">QmlViewer.loadProject</a>.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">project</span>: <span class="tsd-signature-type">QmlProject</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+<div class="tsd-comment tsd-typography">
+<div class="tsd-tag-throws">
+<h4 class="tsd-anchor-link" id="throws">Throws<a href="#throws" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h4><p>When called before <code>ready</code>.</p>
+</div></div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1084">qmlruntime.js:1084</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="loadqml"><span>load<wbr/>Qml</span><a href="#loadqml" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="loadqml-1"><span class="tsd-kind-call-signature">loadQml</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">source</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#loadqml-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Loads a QML document from a string, replacing the current scene; see
+<a href="qmlruntime.QmlViewer.html#loadqml" class="tsd-kind-method">QmlViewer.loadQml</a>.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">source</span>: <span class="tsd-signature-type">string</span></span>
+<div class="tsd-comment tsd-typography"><p>QML source.</p>
+</div></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+<div class="tsd-comment tsd-typography">
+<div class="tsd-tag-throws">
+<h4 class="tsd-anchor-link" id="throws-1">Throws<a href="#throws-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h4><p>When called before <code>ready</code>.</p>
+</div></div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1071">qmlruntime.js:1071</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="on"><span>on</span><a href="#on" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="on-1"><span class="tsd-kind-call-signature">on</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">event</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">callback</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">detail</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="" class="tsd-signature-type tsd-kind-class">QmlRuntime</a><a href="#on-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Adds a listener that receives the event's <code>detail</code>. See the class
+description for the events.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">event</span>: <span class="tsd-signature-type">string</span></span></li>
+<li><span><span class="tsd-kind-parameter">callback</span>: <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">detail</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <a href="" class="tsd-signature-type tsd-kind-class">QmlRuntime</a></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/qmlruntime.js#L1170">qmlruntime.js:1170</a></li></ul></aside></div></li></ul></section></section></details></div>
+<div class="col-sidebar">
+<div class="page-menu">
+<div class="tsd-navigation settings">
+<details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>Settings</h3></summary>
+<div class="tsd-accordion-details">
+<div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span>
+<ul id="tsd-filter-options">
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></div>
+<div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div>
+<details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>On This Page</h3></summary>
+<div class="tsd-accordion-details">
+<details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Constructors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Constructors</summary>
+<div><a href="#constructor"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Constructor"><use href="../assets/icons.svg#icon-512"></use></svg><span>constructor</span></a></div></details>
+<details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Accessors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Accessors</summary>
+<div><a href="#accessibility"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>accessibility</span></a><a href="#colorscheme"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>color<wbr/>Scheme</span></a><a href="#container"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>container</span></a><a href="#controlsstyle"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>controls<wbr/>Style</span></a><a href="#environment"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>environment</span></a><a href="#fillheight"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>fill<wbr/>Height</span></a><a href="#fillwidth"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>fill<wbr/>Width</span></a><a href="#hotreload"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>hot<wbr/>Reload</span></a><a href="#hotreloadavailable"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>hot<wbr/>Reload<wbr/>Available</span></a><a href="#instance"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>instance</span></a><a href="#loggingrules"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>logging<wbr/>Rules</span></a><a href="#mode"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>mode</span></a><a href="#module"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>module</span></a><a href="#qtversion"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>qt<wbr/>Version</span></a><a href="#ready"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>ready</span></a><a href="#resizeenabled"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>resize<wbr/>Enabled</span></a><a href="#viewer"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>viewer</span></a></div></details>
+<details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Methods</summary>
+<div><a href="#clear"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>clear</span></a><a href="#destroy"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>destroy</span></a><a href="#geterrors"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Errors</span></a><a href="#load"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>load</span></a><a href="#loadproject"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>load<wbr/>Project</span></a><a href="#loadqml"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>load<wbr/>Qml</span></a><a href="#on"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>on</span></a></div></details></div></details></div>
+<div class="site-menu">
+<nav class="tsd-navigation"><a href="../index.html">QML Playground JS API</a>
+<ul class="tsd-small-nested-navigation" id="tsd-nav-container">
+<li>Loading...</li></ul></nav></div></div></div><footer>
+<p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
+<div class="overlay"></div></body></html>

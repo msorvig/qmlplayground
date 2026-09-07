@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/qt-project.org/imports/QtQuick/Controls/Universal/impl">/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase/qml/QtQuick/Controls/Universal/impl</file>
+
+  </qresource>
+</RCC>

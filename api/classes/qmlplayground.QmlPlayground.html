@@ -1,0 +1,506 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="../"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>QmlPlayground | QML Playground JS API</title><meta name="description" content="Documentation for QML Playground JS API"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/icons.js" id="tsd-icons-script"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container"><a href="../index.html" class="title">QML Playground JS API</a>
+<div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/>
+<ul role="listbox" id="tsd-search-results"></ul>
+<div id="tsd-search-status" aria-live="polite" aria-atomic="true">
+<div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-menu"></use></svg></a></div></header>
+<div class="container container-main">
+<div class="col-content">
+<div class="tsd-page-title">
+<ul class="tsd-breadcrumb" aria-label="Breadcrumb">
+<li><a href="../modules/qmlplayground.html">qmlplayground</a></li>
+<li><a href="" aria-current="page">QmlPlayground</a></li></ul>
+<h1>Class QmlPlayground</h1></div>
+<section class="tsd-panel tsd-comment">
+<div class="tsd-comment tsd-typography"><p>The QML playground as one component: code editor, live preview, console,
+examples menu and settings dialog, rendered into a shadow root on the host
+element.</p>
+<pre><code class="js"><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">playground</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">QmlPlayground</span><span class="hl-1">(</span><span class="hl-4">document</span><span class="hl-1">.</span><span class="hl-3">getElementById</span><span class="hl-1">(</span><span class="hl-5">&#39;playground&#39;</span><span class="hl-1">));</span><br/><span class="hl-4">playground</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-5">&#39;ready&#39;</span><span class="hl-1">, ({ </span><span class="hl-4">loadTime</span><span class="hl-1"> }) </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-4">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-5">`ready in </span><span class="hl-0">${</span><span class="hl-4">loadTime</span><span class="hl-0">}</span><span class="hl-5"> ms`</span><span class="hl-1">));</span><br/><span class="hl-6">await</span><span class="hl-1"> </span><span class="hl-4">playground</span><span class="hl-1">.</span><span class="hl-3">init</span><span class="hl-1">();</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Settings (build mode, theme, hot reload, accessibility, experimental
+examples, logging rules) are stored in <code>localStorage</code>, read when the
+playground is created, and exposed by the static getters.</p>
+<p>Connect to each event using the <a href="#on" class="tsd-kind-method">on</a> method, which
+passes the event's <code>detail</code> to the callback. Issues have the shape of
+<a href="../interfaces/qmlruntime.QmlIssue.html" class="tsd-kind-interface">QmlIssue</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Detail</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>editorready</code></td>
+<td>none</td>
+<td>The editor is initialized</td>
+</tr>
+<tr>
+<td><code>loading</code></td>
+<td>none</td>
+<td>The Qt runtime starts loading</td>
+</tr>
+<tr>
+<td><code>ready</code></td>
+<td><code>{ loadTime, qtVersion }</code></td>
+<td>The runtime is ready; the editor content is run</td>
+</tr>
+<tr>
+<td><code>running</code></td>
+<td>none</td>
+<td>A run started</td>
+</tr>
+<tr>
+<td><code>qmlloaded</code></td>
+<td>none</td>
+<td>A run finished, before its issues are reported</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td><code>{ line, column, message }</code></td>
+<td>A QML error, or a playground error: runtime not ready, example not found, fetch failed</td>
+</tr>
+<tr>
+<td><code>warning</code></td>
+<td><code>{ line, column, message }</code></td>
+<td>A QML warning</td>
+</tr>
+<tr>
+<td><code>errors</code></td>
+<td><code>{ errors, warnings }</code></td>
+<td>A run finished with errors</td>
+</tr>
+<tr>
+<td><code>warnings</code></td>
+<td><code>{ warnings }</code></td>
+<td>A run finished with warnings only</td>
+</tr>
+<tr>
+<td><code>success</code></td>
+<td>none</td>
+<td>A run finished without issues</td>
+</tr>
+<tr>
+<td><code>examplesloaded</code></td>
+<td><code>{ examples }</code></td>
+<td>The examples index is loaded</td>
+</tr>
+<tr>
+<td><code>exampleloaded</code></td>
+<td><code>{ example, source }</code></td>
+<td>An example was loaded into the editor; <code>source</code> only for single-file examples</td>
+</tr>
+</tbody>
+</table>
+</div></section>
+<section class="tsd-panel tsd-hierarchy" data-refl="369">
+<h4>Hierarchy</h4>
+<ul class="tsd-hierarchy">
+<li class="tsd-hierarchy-item"><span class="tsd-signature-type">EventTarget</span>
+<ul class="tsd-hierarchy">
+<li class="tsd-hierarchy-item"><span class="tsd-hierarchy-target">QmlPlayground</span></li></ul></li></ul></section><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L65">frontend/playground/qmlplayground.js:65</a></li></ul></aside>
+<section class="tsd-panel-group tsd-index-group">
+<section class="tsd-panel tsd-index-panel">
+<details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h5 class="tsd-index-heading uppercase">Index</h5></summary>
+<div class="tsd-accordion-details">
+<section class="tsd-index-section">
+<h3 class="tsd-index-heading tsd-anchor-link" id="constructors">Constructors<a href="#constructors" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-index-list"><a href="#constructor" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Constructor"><use href="../assets/icons.svg#icon-512"></use></svg><span>constructor</span></a>
+</div></section>
+<section class="tsd-index-section">
+<h3 class="tsd-index-heading tsd-anchor-link" id="properties">Properties<a href="#properties" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-index-list"><a href="#activepath" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>active<wbr/>Path</span></a>
+<a href="#autorun" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>auto<wbr/>Run</span></a>
+<a href="#buildmode" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>build<wbr/>Mode</span></a>
+<a href="#container" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>container</span></a>
+<a href="#editor" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>editor</span></a>
+<a href="#examplesurl" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>examples<wbr/>Url</span></a>
+<a href="#project" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>project</span></a>
+<a href="#runtime" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>runtime</span></a>
+<a href="#shadow" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>shadow</span></a>
+<a href="#theme" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>theme</span></a>
+</div></section>
+<section class="tsd-index-section">
+<h3 class="tsd-index-heading tsd-anchor-link" id="methods">Methods<a href="#methods" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-index-list"><a href="#getexamples" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Examples</span></a>
+<a href="#getproject" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Project</span></a>
+<a href="#getvalue" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Value</span></a>
+<a href="#init" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>init</span></a>
+<a href="#loadexample" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>load<wbr/>Example</span></a>
+<a href="#loadexamples" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>load<wbr/>Examples</span></a>
+<a href="#log" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>log</span></a>
+<a href="#on" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>on</span></a>
+<a href="#refresh" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>refresh</span></a>
+<a href="#run" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>run</span></a>
+<a href="#setactivefile" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Active<wbr/>File</span></a>
+<a href="#setvalue" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Value</span></a>
+<a href="#getaccessibility" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Accessibility</span></a>
+<a href="#getbuildmode" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Build<wbr/>Mode</span></a>
+<a href="#getexperimentalexamples" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Experimental<wbr/>Examples</span></a>
+<a href="#gethotreload" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Hot<wbr/>Reload</span></a>
+<a href="#gettheme" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Theme</span></a>
+</div></section></div></details></section></section>
+<details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Constructors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h2 class="tsd-anchor-link" id="constructors-1">Constructors<a href="#constructors-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
+<section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="constructor"><span>constructor</span><a href="#constructor" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="constructorqmlplayground"><span class="tsd-signature-keyword">new</span> <span class="tsd-kind-constructor-signature">QmlPlayground</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">container</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">HTMLElement</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="" class="tsd-signature-type tsd-kind-class">QmlPlayground</a><a href="#constructorqmlplayground" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Builds the playground UI in a shadow root on <code>container</code>. Call
+<a href="#init" class="tsd-kind-method">init</a> to start the editor and runtime.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">container</span>: <span class="tsd-signature-type">HTMLElement</span></span>
+<div class="tsd-comment tsd-typography"><p>Host element. Gets a <code>data-theme</code> attribute of <code>light</code> or <code>dark</code>.</p>
+</div></li></ul></div>
+<h4 class="tsd-returns-title">Returns <a href="" class="tsd-signature-type tsd-kind-class">QmlPlayground</a></h4><aside class="tsd-sources">
+<p>Overrides EventTarget.constructor</p>
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L138">frontend/playground/qmlplayground.js:138</a></li></ul></aside></div></li></ul></section></section></details>
+<details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h2 class="tsd-anchor-link" id="properties-1">Properties<a href="#properties-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
+<section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="activepath"><span>active<wbr/>Path</span><a href="#activepath" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">activePath</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+<div class="tsd-comment tsd-typography"><p>Path of the project file shown in the editor.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L173">frontend/playground/qmlplayground.js:173</a></li>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1634">frontend/playground/qmlplayground.js:1634</a></li>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1650">frontend/playground/qmlplayground.js:1650</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="autorun"><span>auto<wbr/>Run</span><a href="#autorun" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">autoRun</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-comment tsd-typography"><p>Run the project on editor changes. An edit made during a run is run once that run completes.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L156">frontend/playground/qmlplayground.js:156</a></li>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1067">frontend/playground/qmlplayground.js:1067</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="buildmode"><span>build<wbr/>Mode</span><a href="#buildmode" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">buildMode</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;static&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;shared&quot;</span></div>
+<div class="tsd-comment tsd-typography"><p>Build mode in use.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L145">frontend/playground/qmlplayground.js:145</a></li>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1121">frontend/playground/qmlplayground.js:1121</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="container"><span>container</span><a href="#container" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">container</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">HTMLElement</span></div>
+<div class="tsd-comment tsd-typography"><p>Host element.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L141">frontend/playground/qmlplayground.js:141</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="editor"><span>editor</span><a href="#editor" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">editor</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">QmlEditor</span></div>
+<div class="tsd-comment tsd-typography"><p>The code editor. <code>null</code> until <a href="#init" class="tsd-kind-method">init</a>.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L169">frontend/playground/qmlplayground.js:169</a></li>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1034">frontend/playground/qmlplayground.js:1034</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="examplesurl"><span>examples<wbr/>Url</span><a href="#examplesurl" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">examplesUrl</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+<div class="tsd-comment tsd-typography"><p>URL of the examples index. Example files resolve relative to it. Set before <a href="#init" class="tsd-kind-method">init</a>.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L154">frontend/playground/qmlplayground.js:154</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="project"><span>project</span><a href="#project" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">project</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">QmlProject</span></div>
+<div class="tsd-comment tsd-typography"><p>The project being edited.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L171">frontend/playground/qmlplayground.js:171</a></li>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1633">frontend/playground/qmlplayground.js:1633</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="runtime"><span>runtime</span><a href="#runtime" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">runtime</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">QmlRuntime</span></div>
+<div class="tsd-comment tsd-typography"><p>The preview runtime. <code>null</code> until <a href="#init" class="tsd-kind-method">init</a>.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L164">frontend/playground/qmlplayground.js:164</a></li>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1310">frontend/playground/qmlplayground.js:1310</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="shadow"><span>shadow</span><a href="#shadow" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">shadow</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">ShadowRoot</span></div>
+<div class="tsd-comment tsd-typography"><p>Shadow root holding the playground DOM.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L143">frontend/playground/qmlplayground.js:143</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="theme"><span>theme</span><a href="#theme" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">theme</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;light&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;dark&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;system&quot;</span></div>
+<div class="tsd-comment tsd-typography"><p>Theme in use.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L147">frontend/playground/qmlplayground.js:147</a></li>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1111">frontend/playground/qmlplayground.js:1111</a></li></ul></aside></section></section></details>
+<details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h2 class="tsd-anchor-link" id="methods-1">Methods<a href="#methods-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
+<section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="getexamples"><span>get<wbr/>Examples</span><a href="#getexamples" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="getexamples-1"><span class="tsd-kind-call-signature">getExamples</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/qmlplayground.Example.html" class="tsd-signature-type tsd-kind-interface">Example</a><span class="tsd-signature-symbol">[]</span><a href="#getexamples-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Returns the examples loaded by <a href="#loadexamples" class="tsd-kind-method">loadExamples</a>.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <a href="../interfaces/qmlplayground.Example.html" class="tsd-signature-type tsd-kind-interface">Example</a><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1575">frontend/playground/qmlplayground.js:1575</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="getproject"><span>get<wbr/>Project</span><a href="#getproject" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="getproject-1"><span class="tsd-kind-call-signature">getProject</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">QmlProject</span><a href="#getproject-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Returns the project being edited.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">QmlProject</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1431">frontend/playground/qmlplayground.js:1431</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="getvalue"><span>get<wbr/>Value</span><a href="#getvalue" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="getvalue-1"><span class="tsd-kind-call-signature">getValue</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><a href="#getvalue-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Returns the editor content.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1412">frontend/playground/qmlplayground.js:1412</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="init"><span>init</span><a href="#init" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="init-1"><span class="tsd-kind-call-signature">init</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="" class="tsd-signature-type tsd-kind-class">QmlPlayground</a><span class="tsd-signature-symbol">&gt;</span><a href="#init-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Starts the playground: initializes the editor and UI, loads the Qt
+runtime, fetches the examples index and loads the <code>hello.qml</code> example.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="" class="tsd-signature-type tsd-kind-class">QmlPlayground</a><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L974">frontend/playground/qmlplayground.js:974</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="loadexample"><span>load<wbr/>Example</span><a href="#loadexample" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="loadexample-1"><span class="tsd-kind-call-signature">loadExample</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">nameOrFile</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#loadexample-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Loads an example into the editor and runs it. A single-file example
+becomes a one-file project; a project example replaces the whole project
+and shows the file tree. Emits <code>exampleloaded</code>, or <code>error</code> if the
+example is unknown or cannot be fetched.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">nameOrFile</span>: <span class="tsd-signature-type">string</span></span>
+<div class="tsd-comment tsd-typography"><p>The example's <code>name</code>, <code>file</code> or <code>project</code>.</p>
+</div></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1590">frontend/playground/qmlplayground.js:1590</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="loadexamples"><span>load<wbr/>Examples</span><a href="#loadexamples" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="loadexamples-1"><span class="tsd-kind-call-signature">loadExamples</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/qmlplayground.Example.html" class="tsd-signature-type tsd-kind-interface">Example</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span><a href="#loadexamples-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Fetches the examples index from <a href="#examplesurl" class="tsd-kind-property">examplesUrl</a> and rebuilds the
+examples menu. Emits <code>examplesloaded</code>, or <code>error</code> if the fetch fails.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/qmlplayground.Example.html" class="tsd-signature-type tsd-kind-interface">Example</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><p>The examples; empty on failure.</p>
+<aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1525">frontend/playground/qmlplayground.js:1525</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="log"><span>log</span><a href="#log" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="log-1"><span class="tsd-kind-call-signature">log</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">message</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">type</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;error&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;info&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;success&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;warn&quot;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#log-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Appends a timestamped line to the console pane.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">message</span>: <span class="tsd-signature-type">string</span></span>
+<div class="tsd-comment tsd-typography"><p>Inserted as HTML.</p>
+</div></li>
+<li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">type</span>: <span class="tsd-signature-type">&quot;error&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;info&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;success&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;warn&quot;</span><span class="tsd-signature-symbol"> = &#39;info&#39;</span></span>
+<div class="tsd-comment tsd-typography"><p>Styles the line.</p>
+</div></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1394">frontend/playground/qmlplayground.js:1394</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="on"><span>on</span><a href="#on" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="on-1"><span class="tsd-kind-call-signature">on</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">event</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">callback</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">detail</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="" class="tsd-signature-type tsd-kind-class">QmlPlayground</a><a href="#on-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Adds a listener that receives the event's <code>detail</code>. See the class
+description for the events.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">event</span>: <span class="tsd-signature-type">string</span></span></li>
+<li><span><span class="tsd-kind-parameter">callback</span>: <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">detail</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <a href="" class="tsd-signature-type tsd-kind-class">QmlPlayground</a></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1692">frontend/playground/qmlplayground.js:1692</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="refresh"><span>refresh</span><a href="#refresh" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="refresh-1"><span class="tsd-kind-call-signature">refresh</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#refresh-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Re-lays out the editor, e.g. after its container changed size.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1516">frontend/playground/qmlplayground.js:1516</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="run"><span>run</span><a href="#run" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="run-1"><span class="tsd-kind-call-signature">run</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#run-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Runs the project in the preview. Emits <code>running</code>, then when the load
+completes <code>qmlloaded</code> followed by one of <code>success</code>, <code>warnings</code> or
+<code>errors</code>. Emits <code>error</code> and returns if the runtime is not ready.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1440">frontend/playground/qmlplayground.js:1440</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="setactivefile"><span>set<wbr/>Active<wbr/>File</span><a href="#setactivefile" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="setactivefile-1"><span class="tsd-kind-call-signature">setActiveFile</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">path</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#setactivefile-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Shows a project file in the editor. Pending edits to the current file
+are saved to the project first. Paths not in the project are ignored.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">path</span>: <span class="tsd-signature-type">string</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1644">frontend/playground/qmlplayground.js:1644</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="setvalue"><span>set<wbr/>Value</span><a href="#setvalue" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="setvalue-1"><span class="tsd-kind-call-signature">setValue</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">source</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#setvalue-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Replaces the editor content and the active project file. Does not
+trigger auto-run.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">source</span>: <span class="tsd-signature-type">string</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L1426">frontend/playground/qmlplayground.js:1426</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="getaccessibility"><code class="tsd-tag">Static</code><span>get<wbr/>Accessibility</span><a href="#getaccessibility" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="getaccessibility-1"><span class="tsd-kind-call-signature">getAccessibility</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><a href="#getaccessibility-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Whether accessibility is enabled in settings. Default <code>true</code>.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L88">frontend/playground/qmlplayground.js:88</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="getbuildmode"><code class="tsd-tag">Static</code><span>get<wbr/>Build<wbr/>Mode</span><a href="#getbuildmode" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="getbuildmode-1"><span class="tsd-kind-call-signature">getBuildMode</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;static&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;shared&quot;</span><a href="#getbuildmode-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Build mode from settings.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">&quot;static&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;shared&quot;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L67">frontend/playground/qmlplayground.js:67</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="getexperimentalexamples"><code class="tsd-tag">Static</code><span>get<wbr/>Experimental<wbr/>Examples</span><a href="#getexperimentalexamples" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="getexperimentalexamples-1"><span class="tsd-kind-call-signature">getExperimentalExamples</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><a href="#getexperimentalexamples-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Whether the examples menu lists experimental examples.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L77">frontend/playground/qmlplayground.js:77</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="gethotreload"><code class="tsd-tag">Static</code><span>get<wbr/>Hot<wbr/>Reload</span><a href="#gethotreload" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="gethotreload-1"><span class="tsd-kind-call-signature">getHotReload</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><a href="#gethotreload-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Whether hot reload is enabled in settings. Default <code>true</code>.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L82">frontend/playground/qmlplayground.js:82</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="gettheme"><code class="tsd-tag">Static</code><span>get<wbr/>Theme</span><a href="#gettheme" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="gettheme-1"><span class="tsd-kind-call-signature">getTheme</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;light&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;dark&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;system&quot;</span><a href="#gettheme-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Theme from settings.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">&quot;light&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;dark&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;system&quot;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/msorvig/qmlplayground/blob/a20602f5ea4ed8e2b54349d7aa4012e4e5c8bcd4/src/frontend/playground/qmlplayground.js#L72">frontend/playground/qmlplayground.js:72</a></li></ul></aside></div></li></ul></section></section></details></div>
+<div class="col-sidebar">
+<div class="page-menu">
+<div class="tsd-navigation settings">
+<details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>Settings</h3></summary>
+<div class="tsd-accordion-details">
+<div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span>
+<ul id="tsd-filter-options">
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></div>
+<div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div>
+<details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>On This Page</h3></summary>
+<div class="tsd-accordion-details">
+<details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Constructors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Constructors</summary>
+<div><a href="#constructor"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Constructor"><use href="../assets/icons.svg#icon-512"></use></svg><span>constructor</span></a></div></details>
+<details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Properties</summary>
+<div><a href="#activepath"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>active<wbr/>Path</span></a><a href="#autorun"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>auto<wbr/>Run</span></a><a href="#buildmode"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>build<wbr/>Mode</span></a><a href="#container"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>container</span></a><a href="#editor"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>editor</span></a><a href="#examplesurl"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>examples<wbr/>Url</span></a><a href="#project"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>project</span></a><a href="#runtime"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>runtime</span></a><a href="#shadow"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>shadow</span></a><a href="#theme"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>theme</span></a></div></details>
+<details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Methods</summary>
+<div><a href="#getexamples"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Examples</span></a><a href="#getproject"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Project</span></a><a href="#getvalue"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Value</span></a><a href="#init"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>init</span></a><a href="#loadexample"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>load<wbr/>Example</span></a><a href="#loadexamples"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>load<wbr/>Examples</span></a><a href="#log"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>log</span></a><a href="#on"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>on</span></a><a href="#refresh"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>refresh</span></a><a href="#run"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>run</span></a><a href="#setactivefile"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Active<wbr/>File</span></a><a href="#setvalue"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Value</span></a><a href="#getaccessibility"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Accessibility</span></a><a href="#getbuildmode"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Build<wbr/>Mode</span></a><a href="#getexperimentalexamples"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Experimental<wbr/>Examples</span></a><a href="#gethotreload"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Hot<wbr/>Reload</span></a><a href="#gettheme"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Theme</span></a></div></details></div></details></div>
+<div class="site-menu">
+<nav class="tsd-navigation"><a href="../index.html">QML Playground JS API</a>
+<ul class="tsd-small-nested-navigation" id="tsd-nav-container">
+<li>Loading...</li></ul></nav></div></div></div><footer>
+<p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
+<div class="overlay"></div></body></html>

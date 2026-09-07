@@ -1,0 +1,16 @@
+[
+    { "name": "Hello World", "file": "hello.qml" },
+    { "name": "Animation", "file": "animation.qml" },
+    { "name": "Mouse Area", "file": "mousearea.qml" },
+    { "name": "Controls", "file": "controls.qml" },
+    { "name": "ApplicationWindow", "file": "applicationwindow.qml", "experimental": true },
+    { "name": "3D Cube", "file": "cube3d.qml" },
+    { "name": "3D Sphere", "file": "sphere3d.qml" },
+    { "name": "Particles", "file": "particles.qml" },
+    { "name": "Bar Graph", "file": "bargraph.qml" },
+    { "name": "Line Graph", "file": "linegraph.qml" },
+    { "name": "Shapes", "file": "shapes.qml", "experimental": true },
+    { "name": "3D Scene", "file": "scene3d.qml", "experimental": true },
+    { "name": "PathView", "file": "pathview.qml", "experimental": true },
+    { "name": "Spinning Cube (project)", "project": "projects/spinning-cube/project.json", "experimental": true }
+]

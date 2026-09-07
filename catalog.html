@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Qt Quick Controls — Catalog</title>
+    <link rel="stylesheet" href="codemirror.min.css">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+            color: #222;
+            line-height: 1.5;
+            display: flex;
+        }
+
+        /* Sidebar navigation */
+        #nav {
+            flex: 0 0 220px;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            overflow: auto;
+            border-right: 1px solid #ececec;
+            padding: 1em 0 2em;
+            background: #fafafa;
+        }
+        #nav .brand {
+            font-weight: 600;
+            font-size: 15px;
+            padding: 0 1em 1em;
+        }
+        #nav h3 {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: #999;
+            margin: 1.2em 1em .3em;
+        }
+        #nav a {
+            display: block;
+            padding: 4px 1em;
+            font-size: 14px;
+            color: #333;
+            text-decoration: none;
+        }
+        #nav a:hover { background: #f0f0f0; }
+        #nav a.active {
+            background: #e8f0fe;
+            color: #1a56db;
+            font-weight: 500;
+            box-shadow: inset 3px 0 0 #1a56db;
+        }
+
+        /* Main content */
+        main {
+            flex: 1;
+            min-width: 0;
+            max-width: 940px;
+            padding: 0 2em 4em;
+        }
+        .toolbar {
+            position: sticky;
+            top: 0;
+            display: flex;
+            align-items: center;
+            gap: .5em;
+            padding: .8em 0;
+            margin-bottom: .5em;
+            background: rgba(255,255,255,.92);
+            backdrop-filter: blur(4px);
+            border-bottom: 1px solid #eee;
+            z-index: 10;
+        }
+        .toolbar label { font-size: 13px; color: #555; }
+        .toolbar select { font-size: 13px; padding: 2px 4px; }
+        .toolbar .spacer { flex: 1; }
+        .toolbar .hint { font-size: 12px; color: #999; }
+
+        h1.comp-title { font-weight: 600; margin: .4em 0 .1em; }
+        p.comp-desc { color: #555; margin: 0 0 1.5em; max-width: 60ch; }
+        .ex-title { font-size: 14px; font-weight: 600; margin: 1.4em 0 .5em; }
+
+        .example {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 1em;
+            align-items: start;
+            margin: 0 0 1em;
+        }
+        .code {
+            margin: 0;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            font-size: 13px;
+            background: #f6f6f6;
+        }
+        .code .CodeMirror { height: auto; background: #f6f6f6; }
+        .code .CodeMirror-lines { padding: 12px 0; }
+        .error-line-bg   { background: rgba(229, 72, 77, 0.16) !important; }
+        .warning-line-bg { background: rgba(204, 167, 0, 0.18) !important; }
+
+        .preview {
+            width: 320px;
+            height: 240px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #d0d0d0;
+            border-radius: 4px;
+            background: #fff;    /* shows as the gap around the content */
+        }
+    </style>
+</head>
+<body>
+
+<nav id="nav"></nav>
+
+<main>
+    <div class="toolbar">
+        <label for="style-select">Style:</label>
+        <select id="style-select">
+            <option value="Default">Default</option>
+            <option value="Basic">Basic</option>
+            <option value="Fusion">Fusion</option>
+            <option value="Material">Material</option>
+            <option value="Universal">Universal</option>
+        </select>
+        <label for="scheme-select">Theme:</label>
+        <select id="scheme-select">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+        </select>
+        <span class="spacer"></span>
+        <span class="hint">Each preview is editable — try changing a property.</span>
+    </div>
+    <div id="content"></div>
+</main>
+
+<script type="module" src="./catalog.js"></script>
+
+</body>
+</html>

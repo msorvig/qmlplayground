@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/qt-project.org/imports/QtQuick/Dialogs">/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase/qml/QtQuick/Dialogs</file>
+
+  </qresource>
+</RCC>

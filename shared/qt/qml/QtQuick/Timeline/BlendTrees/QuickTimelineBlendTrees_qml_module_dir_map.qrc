@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/qt-project.org/imports/QtQuick/Timeline/BlendTrees">/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase/qml/QtQuick/Timeline/BlendTrees</file>
+
+  </qresource>
+</RCC>

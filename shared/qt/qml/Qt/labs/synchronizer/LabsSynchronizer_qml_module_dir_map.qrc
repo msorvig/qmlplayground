@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/qt-project.org/imports/Qt/labs/synchronizer">/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase/qml/Qt/labs/synchronizer</file>
+
+  </qresource>
+</RCC>

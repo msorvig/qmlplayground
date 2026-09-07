@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/qt-project.org/imports/QtQuick/Particles">/Users/msorvig/code/qmlplayground/qt/wasm-shared/qtbase/qml/QtQuick/Particles</file>
+
+  </qresource>
+</RCC>
