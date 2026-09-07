@@ -194,7 +194,7 @@ class QmlPlayground extends EventTarget {
         }
         this.editor?.setTheme(resolved);
         // Match the QML preview's color scheme to the theme (light/dark).
-        this.runtime?.setColorScheme(resolved);
+        if (this.runtime) this.runtime.colorScheme = resolved;
     }
 
     _buildDOM() {
@@ -1113,18 +1113,17 @@ class QmlPlayground extends EventTarget {
                 this._applyTheme();
             });
 
-            // Build mode selector — applies immediately, dialog stays open.
+            // Build mode selector — the runtime reloads itself; dialog stays open.
             this.buildModeSelectElement.value = this.buildMode;
             this.buildModeSelectElement.addEventListener('change', (e) => {
                 const mode = e.target.value;
                 localStorage.setItem('qmlplayground-build-mode', mode);
-                this._loadRuntime(mode);
+                this.buildMode = mode;
+                if (this.runtime) this.runtime.mode = mode;
             });
 
-            // Hot reload toggle. The view-level flag applies to the next run.
-            // The service behind it has to be started with the runtime, so
-            // turning it on for a runtime that was loaded without it reloads
-            // the runtime (like a build mode change).
+            // Hot reload toggle. Applies to the next run; the runtime reloads
+            // itself if its instance was started without the service.
             if (this.hotReloadElement) {
                 this.hotReloadElement.checked = QmlPlayground.getHotReload();
                 this.hotReloadElement.addEventListener('change', (e) => {
@@ -1132,22 +1131,17 @@ class QmlPlayground extends EventTarget {
                     localStorage.setItem('qmlplayground-hot-reload', on);
                     if (!this.runtime) return;
                     this.runtime.hotReload = on;
-                    if (on && !this.runtime.hotReloadAvailable) {
-                        this._loadRuntime(this.buildMode);
-                        return;
-                    }
                     this.log(`Hot reload ${on ? 'enabled' : 'disabled'}`);
                 });
             }
 
-            // Accessibility toggle. QT_WASM_ENABLE_ACCESSIBILITY is read at
-            // platform startup, so a change reloads the runtime.
+            // Accessibility toggle. Read at platform startup, so the runtime
+            // reloads itself.
             if (this.accessibilityElement) {
                 this.accessibilityElement.checked = QmlPlayground.getAccessibility();
                 this.accessibilityElement.addEventListener('change', (e) => {
                     localStorage.setItem('qmlplayground-accessibility', e.target.checked);
-                    if (this.runtime)
-                        this._loadRuntime(this.buildMode);
+                    if (this.runtime) this.runtime.accessibility = e.target.checked;
                 });
             }
 
@@ -1208,12 +1202,12 @@ class QmlPlayground extends EventTarget {
                 });
             });
 
-            // Logging rules apply on textarea blur (change event) — reloads
-            // the runtime with the new rules; dialog stays open.
+            // Logging rules apply on textarea blur (change event) — the
+            // runtime reloads with the new rules; dialog stays open.
             this.loggingRulesElement.addEventListener('change', () => {
                 const rules = this.loggingRulesElement.value.trim();
                 localStorage.setItem('qmlplayground-logging-rules', rules);
-                this._loadRuntime(this.buildMode);
+                if (this.runtime) this.runtime.loggingRules = rules;
             });
             // Toggling a checkbox already updates the textarea via the
             // existing handler; piggy-back to persist + reload.
@@ -1221,7 +1215,7 @@ class QmlPlayground extends EventTarget {
                 cb.addEventListener('change', () => {
                     const rules = this.loggingRulesElement.value.trim();
                     localStorage.setItem('qmlplayground-logging-rules', rules);
-                    this._loadRuntime(this.buildMode);
+                    if (this.runtime) this.runtime.loggingRules = rules;
                 });
             });
         }
@@ -1246,10 +1240,9 @@ class QmlPlayground extends EventTarget {
             this.resizerElement.setPointerCapture(e.pointerId);
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
-            // Suspend Qt canvas resize while dragging — see QmlRuntime
-            // setResizeEnabled. Avoids per-frame black flash from the WebGL
-            // buffer-clear.
-            this.runtime?.setResizeEnabled(false);
+            // Suspend Qt canvas resize while dragging (QmlRuntime.resizeEnabled).
+            // Avoids per-frame black flash from the WebGL buffer-clear.
+            if (this.runtime) this.runtime.resizeEnabled = false;
         });
 
         this.resizerElement.addEventListener('pointermove', (e) => {
@@ -1275,7 +1268,7 @@ class QmlPlayground extends EventTarget {
                 this.resizerElement.releasePointerCapture(e.pointerId);
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
-                this.runtime?.setResizeEnabled(true);
+                if (this.runtime) this.runtime.resizeEnabled = true;
                 this.refresh();
             }
         });
@@ -1307,41 +1300,31 @@ class QmlPlayground extends EventTarget {
         this.loggingRulesElement.value = [...checkedRules, ...manualLines].join('\n');
     }
 
-    // Initialize QmlRuntime
+    // Create the runtime from the saved settings and hook up its events. Later
+    // setting changes are property writes on the runtime; it reloads itself
+    // when a process-level one changes, emitting loading/ready again.
     async _initRuntime() {
-        await this._loadRuntime(this.buildMode);
-    }
-
-    // Load (or reload) the Qt runtime for the given build mode
-    async _loadRuntime(mode) {
         if (!this.containerElement) return;
-
-        // Tear down existing runtime
-        if (this.runtime) {
-            this.runtime.destroy();
-            this.runtime = null;
-        }
-
-        this.buildMode = mode;
-
-        this._showLoading();
-        this._setStatus('loading');
-        this.log(`Loading Qt runtime (${mode})...`);
 
         const loggingRules = localStorage.getItem('qmlplayground-logging-rules') || '';
         this.runtime = new QmlRuntime(this.containerElement, {
-            mode, loggingRules,
+            mode: this.buildMode, loggingRules,
             colorScheme: QmlPlayground._resolveTheme(this.theme),
             hotReload: QmlPlayground.getHotReload(),
             accessibility: QmlPlayground.getAccessibility(),
         });
 
-        this.runtime.on('loading', () => this._emit('loading'));
+        this.runtime.on('loading', () => {
+            this._showLoading();
+            this._setStatus('loading');
+            this.log(`Loading Qt runtime (${this.runtime.mode})...`);
+            this._emit('loading');
+        });
         this.runtime.on('ready', (detail) => {
             this._hideLoading();
             this._setStatus('ready');
-            this.log(`Qt ${detail.qtVersion} ready [${mode}] (${detail.loadTime.toFixed(0)}ms)`, 'success');
-            if (QmlPlayground.getHotReload())
+            this.log(`Qt ${detail.qtVersion} ready [${this.runtime.mode}] (${detail.loadTime.toFixed(0)}ms)`, 'success');
+            if (this.runtime.hotReload)
                 this.log(`Hot reload ${this.runtime.hotReloadAvailable ? 'enabled' : 'unavailable in this runtime'}`);
             if (this.runtime.accessibility)
                 this.log('Accessibility enabled');

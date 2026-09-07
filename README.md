@@ -14,7 +14,7 @@ The repository ships two web front-ends over a shared core:
 | **Component viewer** | `catalog.html`, `components.html` | Inline live previews embedded next to code samples in a doc-style page |
 
 Both are built on the same three shared modules — `qmlruntime.js`
-(`QmlInstance` / `QmlRuntime`), `qmleditor.js` (`QmlEditor`) and
+(`QmlInstance` / `QmlViewer` / `QmlRuntime`), `qmleditor.js` (`QmlEditor`) and
 `qmlproject.js` (`QmlProject`). There is one wasm binary and one build for
 both.
 
@@ -158,7 +158,9 @@ may keep their original styling until they are recreated.
 
 ### QmlRuntime
 
-Lower-level wrapper for the Qt WebAssembly runtime. Use this when you need just the runtime without the editor.
+Lower-level wrapper for the Qt WebAssembly runtime: one QML view in a DOM
+element, with the Qt process behind it managed for you. Use this when you need
+just the runtime without the editor.
 
 ```javascript
 import { QmlRuntime } from './qmlruntime.js';
@@ -180,24 +182,44 @@ runtime.loadQml(`
 `);
 ```
 
-#### Configuring QmlRuntime
+#### Options
 
-The constructor accepts an optional config object:
+The constructor takes an optional config object. Every option is also a
+read/write property of the same name.
 
 ```javascript
 const runtime = new QmlRuntime(document.getElementById('container'), {
     mode: 'shared',
-    loggingRules: 'qt.qml.import.debug=true;qt.qml.pluginloadblob.debug=true',
+    controlsStyle: 'Material',
+    loggingRules: 'qt.qml.import.debug=true',
     hotReload: true,
 });
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `mode` | `'static'` | `'static'` or `'shared'` |
-| `loggingRules` | `''` | Qt logging filter rules (semicolon-separated), passed via `QT_LOGGING_RULES` |
-| `hotReload` | `false` | Start the QmlPreview service in the wasm instance and use it for `loadProject()`; see [Hot reload](#hot-reload) |
-| `accessibility` | `false` | Expose the scene to screen readers: sets `QT_WASM_ENABLE_ACCESSIBILITY=1`, and Qt mirrors the scene as accessible HTML elements. Read at startup, so it is fixed for the instance |
+| `mode` | `'static'` | `'static'` or `'shared'`; see [Build Modes](#build-modes) |
+| `module` | `null` | Pre-compiled `WebAssembly.Module` (or a promise of one) to instantiate from, instead of fetching and compiling |
+| `environment` | `{}` | Extra environment variables for the Qt process |
+| `loggingRules` | `''` | Qt logging filter rules, one per line, passed via `QT_LOGGING_RULES` |
+| `controlsStyle` | `''` | Qt Quick Controls style, e.g. `'Material'`; empty for the build's default |
+| `colorScheme` | `''` | `'light'`, `'dark'`, or `'auto'`/empty to follow the system |
+| `hotReload` | `false` | Start the QmlPreview service and use it for `loadProject()`; see [Hot reload](#hot-reload) |
+| `accessibility` | `false` | Expose the scene to screen readers: sets `QT_WASM_ENABLE_ACCESSIBILITY=1`, and Qt mirrors the scene as accessible HTML elements |
+| `fillWidth`, `fillHeight` | `true` | Stretch the root item to the window on that axis; `false` keeps its implicit size and centers it |
+| `resizeEnabled` | `true` | Forward container size changes to Qt |
+
+`colorScheme`, `fillWidth`, `fillHeight`, `resizeEnabled` and `hotReload`
+apply immediately when set. The others configure the Qt process, and setting
+one reloads it: the runtime recreates its instance, emits `loading` and
+`ready` again, and re-runs the last loaded QML. Several changes made in one go
+cause one reload, and `load()` returns the promise of the reload in flight.
+
+```javascript
+runtime.controlsStyle = 'Fusion';
+runtime.mode = 'shared';
+await runtime.load();       // one reload; the previous QML is running again
+```
 
 #### Loading QML
 
@@ -247,8 +269,8 @@ runtime.on('qmlloaded', ({ hot, changed, elapsed }) => { /* hot: patched in plac
 
 | Property | Description |
 |----------|-------------|
-| `hotReload` | Use in-place updates when available. Read/write, applies to the next `loadProject()` |
-| `hotReloadAvailable` | Read-only: the instance was created with `hotReload: true` and the service confirmed in-place mode. There is no enabling the service after the fact, since engines register with it when they are created |
+| `hotReload` | Use in-place updates when available. Read/write, applies to the next `loadProject()`. Turning it on for a runtime whose instance was started without the service reloads the runtime |
+| `hotReloadAvailable` | Read-only: the instance runs the service and it confirmed in-place mode. A `QmlInstance` cannot start the service after the fact, since engines register with it when they are created; `QmlRuntime` reloads instead |
 
 The service is reached through the in-process native debug connector, so no
 socket and no thread are involved: JS pushes the changed files and a `Load`,
@@ -268,8 +290,8 @@ false and loads are full loads.
 
 | Method | Description |
 |--------|-------------|
-| `load()` | Load the Qt runtime (async) |
-| `destroy()` | Tear down the runtime and clean up |
+| `load()` | Load the runtime, or return the promise of the load or reload in flight (async) |
+| `destroy()` | Tear down the view and its Qt process |
 | `loadQml(source)` | Load a single-string QML source via `QQmlComponent::setData` |
 | `loadProject(project)` | Write a `QmlProject` into Emscripten's MEMFS (a directory per view) and load the entry file. Cross-file imports, `qmldir`, and relative URLs resolve through the in-memory filesystem. Patches in place when hot reload applies |
 | `getErrors()` | Get errors/warnings from last load |
@@ -284,6 +306,34 @@ false and loads are full loads.
 | `qmlloaded` | `{ hot, changed?, elapsed? }` | QML loading complete (success or error); check `getErrors()`. `hot` is true for an in-place update, with the changed paths and the time it took |
 | `error` | `{ line, column, message }` | Individual QML error |
 | `warning` | `{ line, column, message }` | Individual QML warning |
+
+### QmlInstance and QmlViewer
+
+`QmlRuntime` is a `QmlInstance` (the Qt process) plus a `QmlViewer` (one QML
+view on it). Use the two directly to run several views on one process, for
+example many small previews on a page: the instance loads once, and the views
+share its filesystem, Controls style and color scheme.
+
+```javascript
+import { QmlInstance, QmlViewer } from './qmlruntime.js';
+
+const instance = new QmlInstance({ controlsStyle: 'Material', hotReload: true });
+const a = new QmlViewer(instance, { container: elementA });
+const b = new QmlViewer(instance, { container: elementB, fillWidth: false, fillHeight: false });
+await Promise.all([a.load(), b.load()]);
+a.loadQml('import QtQuick.Controls\nButton { text: "A" }');
+```
+
+`QmlInstance` takes the process-level options from the table above (`mode`,
+`module`, `environment`, `loggingRules`, `controlsStyle`, `colorScheme`,
+`hotReload`, `accessibility`). All but `colorScheme` are fixed once it is
+loaded. It has `load()`, `destroy()`, the read-only `ready`, `qtVersion` and
+`hotReloadAvailable`, and the events `loading`, `ready` and `error`.
+
+`QmlViewer` takes an instance and the view-level options (`container`,
+`fillWidth`, `fillHeight`, `resizeEnabled`, `hotReload`), all changeable
+except `container`. It has the same methods and events as `QmlRuntime`; its
+`destroy()` leaves the instance running.
 
 ### QmlEditor
 
@@ -522,7 +572,7 @@ src/
   qmlruntime.cpp/h      QmlRuntime C++ source
   imports.qml           QML imports for static linking
 
-  qmlruntime.js         Shared core: QmlInstance / QmlRuntime
+  qmlruntime.js         Shared core: QmlInstance / QmlViewer / QmlRuntime
   qmleditor.js          Shared core: QmlEditor (CodeMirror wrapper)
   qmlproject.js         Shared core: QmlProject (multi-file model)
 

@@ -1,13 +1,13 @@
-// QmlComponentViewer - manages multiple QmlRuntime instances on a page,
-// one per preview. Each preview is its own wasm instance, so per-preview
-// Quick Controls style / scale / etc. work without runtime changes.
+// QmlComponentViewer - manages the live previews on a page. In 'isolated'
+// instancing each preview is a QmlRuntime with its own wasm instance; in
+// 'shared' instancing the previews are QmlViewers on one QmlInstance.
 //
 // An example's QML is authored in two parts: the *preamble* (imports, and
 // anything else the runtime needs but a reader doesn't care about) and the
 // *sample* (the snippet on show). The live preview runs `preamble + sample`;
 // the optional editor displays only the sample.
 
-import { QmlRuntime, QmlInstance } from './qmlruntime.js';
+import { QmlRuntime, QmlInstance, QmlViewer } from './qmlruntime.js';
 import { QmlEditor } from './qmleditor.js';
 import { QmlProject } from './qmlproject.js';
 
@@ -23,6 +23,8 @@ class Preview {
         this.viewer = viewer;
         this.id = id;
         this.container = container;
+        // What runs this preview's QML: a QmlRuntime (isolated instancing) or
+        // a QmlViewer on the shared instance. Same API either way.
         this.runtime = runtime;
         // The snippet editor showing this preview's sample, if it has one.
         this.editor = editor;
@@ -33,7 +35,7 @@ class Preview {
     }
 
     // Load `source` as this preview's document. With hot reload available,
-    // a changed document is patched in place; see QmlRuntime.loadProject().
+    // a changed document is patched in place; see QmlViewer.loadProject().
     loadQml(source) {
         this.project.setEntryContent(source);
         this.runtime.loadProject(this.project);
@@ -92,12 +94,9 @@ class QmlComponentViewer {
         this._modulePromise = null;
     }
 
-    // Environment passed to each runtime — carries the global Controls style.
-    _environment() {
-        const env = {};
-        if (this.style && this.style !== 'Default')
-            env.QT_QUICK_CONTROLS_STYLE = this.style;
-        return env;
+    // Controls style handed to each instance ('' = the build's default).
+    _controlsStyle() {
+        return this.style && this.style !== 'Default' ? this.style : '';
     }
 
     // Fetch + compile the runtime wasm exactly once, lazily on first use.
@@ -119,31 +118,33 @@ class QmlComponentViewer {
         return this._modulePromise;
     }
 
-    // Build the QmlRuntime (view) for a container, per the instancing mode.
-    // Isolated views each own an instance (sharing the compiled module);
-    // shared views all borrow one lazily-created instance.
-    _runtimeFor(container) {
+    // Build the view for a container, per the instancing mode. Isolated views
+    // are QmlRuntimes, each owning an instance (sharing the compiled module);
+    // shared views are QmlViewers on one lazily-created instance.
+    _runtimeFor(container, { fillWidth, fillHeight }) {
         if (this.instancing === 'shared') {
             if (!this._sharedInstance) {
                 this._sharedInstance = new QmlInstance({
                     mode: this.mode,
                     module: this._compileModule(),
-                    environment: this._environment(),
+                    controlsStyle: this._controlsStyle(),
                     colorScheme: this.colorScheme,
                     hotReload: this.hotReload,
                     accessibility: this.accessibility,
                 });
             }
-            return new QmlRuntime(container, { instance: this._sharedInstance,
-                                               hotReload: this.hotReload });
+            return new QmlViewer(this._sharedInstance, {
+                container, fillWidth, fillHeight, hotReload: this.hotReload,
+            });
         }
         return new QmlRuntime(container, {
             mode: this.mode,
             module: this._compileModule(),
-            environment: this._environment(),
+            controlsStyle: this._controlsStyle(),
             colorScheme: this.colorScheme,
             hotReload: this.hotReload,
             accessibility: this.accessibility,
+            fillWidth, fillHeight,
         });
     }
 
@@ -184,7 +185,7 @@ class QmlComponentViewer {
         Object.assign(surface.style, { position: 'absolute', inset: '5px' });
         container.appendChild(surface);
 
-        const runtime = this._runtimeFor(surface);
+        const runtime = this._runtimeFor(surface, { fillWidth, fillHeight });
         const preview = new Preview(this, id, container, runtime, editor);
         preview._surface = surface;
         // Remember how to rebuild this preview (e.g. on a style change).
@@ -208,7 +209,6 @@ class QmlComponentViewer {
             editor?.clearMarkers();
             if (!src) return;
             try {
-                runtime.setSizeMode(fillWidth, fillHeight);
                 preview.loadQml(src);
             } catch (e) {
                 editor?.addMarker(1, 0, e.message, 'error');
@@ -250,10 +250,13 @@ class QmlComponentViewer {
     // editors stay light.
     setColorScheme(scheme) {
         this.colorScheme = scheme;
-        // Shared instance (if any) plus every live view's instance.
-        this._sharedInstance?.setColorScheme(scheme);
-        for (const p of this.previews())
-            p.runtime.setColorScheme(scheme);
+        if (this.instancing === 'shared') {
+            if (this._sharedInstance)
+                this._sharedInstance.colorScheme = scheme;
+        } else {
+            for (const p of this.previews())
+                p.runtime.colorScheme = scheme;
+        }
     }
 
     previews() {
@@ -276,9 +279,9 @@ class QmlComponentViewer {
         }));
         for (const p of this.previews()) p.destroy();
 
-        // The style lives in the wasm environment, baked in at load. In shared
-        // mode that's the single instance, so drop it — the next addPreview
-        // recreates it (reusing the compiled module) with the new style.
+        // The style is fixed per instance. In shared mode that's the single
+        // instance, so drop it — the next addPreview recreates it (reusing the
+        // compiled module) with the new style.
         if (this._sharedInstance) {
             this._sharedInstance.destroy();
             this._sharedInstance = null;

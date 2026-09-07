@@ -14,5 +14,22 @@
     "notExported": false,
     "invalidLink": true,
     "notDocumented": false
-  }
+  },
+  "excludeNotDocumentedKinds": [
+    "Module",
+    "Namespace",
+    "Enum",
+    "Variable",
+    "Function",
+    "Class",
+    "Interface",
+    "Constructor",
+    "Property",
+    "Method",
+    "CallSignature",
+    "ConstructorSignature",
+    "Accessor",
+    "TypeAlias",
+    "Reference"
+  ]
 }
