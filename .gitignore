@@ -30,3 +30,6 @@ dist/
 
 # Claude Code
 .claude/
+
+# npm (TypeDoc)
+node_modules/

@@ -1,21 +1,72 @@
-// QmlInstance + QmlRuntime
-//
-// QmlInstance owns one Qt wasm instance (the emscripten module). It can host
-// many views. All wasm/process-level config lives here: build mode, the
-// (optionally shared) compiled module, environment variables — including
-// QT_QUICK_CONTROLS_STYLE, which is why style is per-instance.
-//
-// QmlRuntime is one *view*: a QML engine + window living inside an instance.
-// Construct it with a container element and either let it create its own
-// instance (the default — one wasm per view) or hand it an existing instance
-// to share ("here, use this one"). Its public API (loadQml, loadProject,
-// getErrors, setSizeMode, on, destroy, …) is unchanged from before, so
-// callers that don't care about instancing keep working.
-//
-// Hot reload: with `hotReload: true` the instance runs qtdeclarative's
-// QmlPreview debug service in-process (see main.cpp). A view whose `hotReload`
-// flag is set then patches the running scene when a project's file contents
-// change, instead of recreating it — the live objects keep their state.
+/**
+ * Qt for WebAssembly runtime: {@link QmlInstance} is a Qt process,
+ * {@link QmlRuntime} is a QML view inside one.
+ *
+ * A QmlInstance holds the emscripten module and the settings that are global
+ * to the process: build mode, environment variables (including
+ * `QT_QUICK_CONTROLS_STYLE`, so the Controls style is per instance), color
+ * scheme, hot reload and accessibility. One instance can host several views.
+ *
+ * A QmlRuntime is a QML engine and window rendered into a DOM element. It
+ * creates a private instance unless one is passed in its config.
+ *
+ * @module qmlruntime
+ */
+
+/**
+ * One QML error or warning.
+ * @typedef {Object} QmlIssue
+ * @property {number} line - Line in the document, 0 when unknown.
+ * @property {number} column - Column in the document, 0 when unknown.
+ * @property {string} message - Description as reported by the QML engine.
+ * @property {'error'|'warning'} [type] - Set on {@link QmlRuntime.getErrors} results. Absent on `error` and `warning` event details, where the event name gives the type.
+ * @property {string} [file] - Document URL. Set on errors from a hot reload.
+ */
+
+/**
+ * Detail of the `ready` event.
+ * @typedef {Object} QmlReady
+ * @property {number} loadTime - Milliseconds from {@link QmlRuntime.load} to ready.
+ * @property {string} qtVersion - Version of the loaded Qt.
+ */
+
+/**
+ * Detail of the `qmlloaded` event.
+ * @typedef {Object} QmlLoaded
+ * @property {boolean} hot - `true` when the running scene was patched in place, `false` for a full load.
+ * @property {string[]} [changed] - Hot reload only: project paths whose contents changed.
+ * @property {number} [elapsed] - Hot reload only: milliseconds the reload took.
+ * @property {Object} [root] - Hot reload only: state of the root item after the patch.
+ */
+
+/**
+ * Configuration for {@link QmlInstance}.
+ * @typedef {Object} QmlInstanceConfig
+ * @property {'static'|'shared'} [mode='static'] - Runtime build to load. `static` is one wasm binary with all Qt modules linked in; `shared` loads Qt libraries and QML modules on demand.
+ * @property {string} [loggingRules=''] - Qt logging rules, one per line. Passed as `QT_LOGGING_RULES`.
+ * @property {WebAssembly.Module|null} [module=null] - Pre-compiled main module. Skips fetching and compiling, so several instances can share one compilation.
+ * @property {Record<string, string>} [environment={}] - Environment variables for the Qt process. Applied last; override variables set by the other options.
+ * @property {'light'|'dark'|'auto'|''} [colorScheme=''] - Forced color scheme. `auto` or empty follows the system.
+ * @property {boolean} [hotReload=false] - Run the QmlPreview service so views can patch a running scene in place. Shared builds also preload the service plugins.
+ * @property {boolean} [accessibility=false] - Expose the scene to screen readers. Sets `QT_WASM_ENABLE_ACCESSIBILITY=1`.
+ */
+
+/**
+ * Configuration for {@link QmlRuntime}. With `instance` set, the view joins
+ * that instance and the remaining options are ignored, except `hotReload`,
+ * which also sets the view's own flag. Without it, the remaining options
+ * configure the private {@link QmlInstance} the view creates; see
+ * {@link QmlInstanceConfig} for their meaning.
+ * @typedef {Object} QmlRuntimeConfig
+ * @property {QmlInstance|null} [instance=null] - Existing instance to render into.
+ * @property {'static'|'shared'} [mode='static']
+ * @property {string} [loggingRules='']
+ * @property {WebAssembly.Module|null} [module=null]
+ * @property {Record<string, string>} [environment={}]
+ * @property {'light'|'dark'|'auto'|''} [colorScheme='']
+ * @property {boolean} [hotReload=false] - Enables hot reload for the private instance and for this view ({@link QmlRuntime.hotReload}).
+ * @property {boolean} [accessibility=false]
+ */
 
 const buildModes = {
     'static': { basePath: 'static', shared: false },
@@ -90,7 +141,24 @@ function parseQmlErrors(text) {
     return issues;
 }
 
+/**
+ * A Qt for WebAssembly process: the emscripten module and the settings that
+ * apply to the whole process. Hosts one or more {@link QmlRuntime} views.
+ *
+ * Create one explicitly to share a process between views:
+ *
+ * ```js
+ * const instance = new QmlInstance();
+ * const a = new QmlRuntime(containerA, { instance });
+ * const b = new QmlRuntime(containerB, { instance });
+ * await Promise.all([a.load(), b.load()]);
+ * ```
+ *
+ * Views sharing an instance share one filesystem, one Controls style and one
+ * color scheme.
+ */
 class QmlInstance {
+    /** @param {QmlInstanceConfig} [config] */
     constructor(config = {}) {
         const {
             mode = 'static',
@@ -102,7 +170,9 @@ class QmlInstance {
             accessibility = false,      // expose the scene to screen readers
         } = config;
 
+        /** Build mode this instance loads. @type {'static'|'shared'} */
         this.mode = mode;
+        /** Qt logging rules passed to the process. @type {string} */
         this.loggingRules = loggingRules;
         this._module = module;          // optional pre-compiled WebAssembly.Module
         this._environment = environment;
@@ -115,16 +185,19 @@ class QmlInstance {
         this._assetBase = assetBaseFor(modeConfig.basePath);
         this._shared = modeConfig.shared;
 
-        this.module = null;             // the emscripten module instance
+        /** The emscripten module. `null` until {@link load} resolves. */
+        this.module = null;
         this._loadPromise = null;
         this._views = new Map();        // preview id -> QmlRuntime (for callback demux)
 
-        // Hot reload. `_hotReload` is the request; `hotReload` turns true once
-        // the service has confirmed in-place updates.
-        this._hotReload = hotReload;
+        this._hotReload = hotReload;    // the request; `hotReload` is the confirmation
+        /**
+         * `true` once the QmlPreview service has confirmed in-place updates. Set during {@link load} when configured with `hotReload: true`.
+         * @type {boolean}
+         */
         this.hotReload = false;
-        // Accessibility: Qt mirrors the scene as accessible HTML elements.
         // Read by the platform plugin at startup, so it is an env var.
+        /** Whether the scene is exposed to screen readers. @type {boolean} */
         this.accessibility = accessibility;
         this._previewSink = null;       // view with a hot reload in flight
         this._lastPreviewView = null;   // ... or the last one that had
@@ -132,7 +205,11 @@ class QmlInstance {
         console.log(`[qmlinstance] creating instance (mode=${mode})`);
     }
 
-    // Boot the wasm. Idempotent: many views sharing an instance load it once.
+    /**
+     * Loads and starts the Qt process. Every call returns the same promise, so
+     * views sharing an instance load it once.
+     * @returns {Promise<void>}
+     */
     load() {
         if (this._loadPromise)
             return this._loadPromise;
@@ -249,12 +326,19 @@ class QmlInstance {
     _previewLoad(url)                { this.module.previewLoad(url); }
     _previewClearCache()             { this.module.previewClearCache(); }
 
+    /**
+     * Version of the loaded Qt. Empty until {@link load} resolves.
+     * @type {string}
+     */
     get qtVersion() {
         return this.module ? this.module.getQtVersion() : '';
     }
 
-    // Force the color scheme ('light' | 'dark' | 'auto'/''). Process-global,
-    // live-settable; remembered so it survives a (re)load.
+    /**
+     * Forces the color scheme for every view in this instance. Applied
+     * immediately when loaded, otherwise on load.
+     * @param {'light'|'dark'|'auto'} scheme - `auto` follows the system.
+     */
     setColorScheme(scheme) {
         this._colorScheme = scheme;
         if (this.module && scheme)
@@ -287,6 +371,10 @@ class QmlInstance {
     _refreshRoot(id)            { return JSON.parse(this.module.refreshRoot(id)); }
     _resize(container)          { this.module.qtResizeContainerElement(container); }
 
+    /**
+     * Releases the instance. Destroy its views first. The wasm memory is
+     * reclaimed by the garbage collector once nothing references the module.
+     */
     destroy() {
         // No clean wasm teardown; drop references and let GC reclaim once all
         // views are gone. Views call _removeView before this.
@@ -296,11 +384,74 @@ class QmlInstance {
     }
 }
 
+/**
+ * QmlRuntime provides a QML view rendered into a DOM element. Add it to the
+ * html document by passing a parent element to its constructor.
+ *
+ * ```js
+ * const runtime = new QmlRuntime(document.getElementById('preview'));
+ * runtime.on('ready', () => runtime.loadQml('import QtQuick\nRectangle { color: "red" }'));
+ * await runtime.load();
+ * ```
+ *
+ * Pass a {@link QmlRuntimeConfig | config object} to QmlRuntime to set config
+ * options. Config options include setting the build mode (static or shared
+ * libraries), and options for enabling accessibility and hot reloading
+ * support.
+ *
+ * ```js
+ * const runtime = new QmlRuntime(container, {
+ *     mode: 'shared',
+ *     accessibility: true,
+ *     hotReload: true,
+ * });
+ * ```
+ *
+ * Each QmlRuntime runs on a {@link QmlInstance} which manages the WebAssembly
+ * instance. Sharing a QmlInstance between multiple runtimes is possible, to
+ * do so create the QmlInstance first and then pass it to the QmlRuntime
+ * constructor.
+ *
+ * ```js
+ * const instance = new QmlInstance();
+ * const a = new QmlRuntime(containerA, { instance });
+ * const b = new QmlRuntime(containerB, { instance });
+ * await Promise.all([a.load(), b.load()]);
+ * ```
+ *
+ * QmlRuntime provides events for reacting to load state and QML compiler
+ * warnings and errors. Connect to each event using the
+ * {@link QmlRuntime.on | on} method, which passes the event's `detail` to the
+ * callback.
+ *
+ * | Event | Detail | When |
+ * |---|---|---|
+ * | `loading` | none | {@link QmlRuntime.load | load} started |
+ * | `ready` | {@link QmlReady} | The view can load QML |
+ * | `error` | {@link QmlIssue} | A QML error, or {@link QmlRuntime.load | load} failed |
+ * | `warning` | {@link QmlIssue} | A QML warning |
+ * | `qmlloaded` | {@link QmlLoaded} | A load finished, with or without errors; see {@link QmlRuntime.getErrors | getErrors} |
+ *
+ * A handler for each event:
+ *
+ * ```js
+ * runtime.on('loading', () => console.log('loading Qt'))
+ *        .on('ready', ({ loadTime, qtVersion }) => console.log(`Qt ${qtVersion} ready in ${loadTime} ms`))
+ *        .on('error', ({ line, column, message }) => console.error(`${line}:${column}: ${message}`))
+ *        .on('warning', ({ line, column, message }) => console.warn(`${line}:${column}: ${message}`))
+ *        .on('qmlloaded', ({ hot }) => console.log(hot ? 'hot reloaded' : 'loaded', runtime.getErrors()));
+ * ```
+ */
 class QmlRuntime extends EventTarget {
+    /**
+     * @param {HTMLElement} container - Element the view renders into.
+     * @param {QmlRuntimeConfig} [config]
+     */
     constructor(container, config = {}) {
         super();
         const { instance = null } = config;
 
+        /** Element the view renders into. @type {HTMLElement} */
         this.container = container;
         // Borrow the given instance, or own one built from the wasm-level
         // config (mode / module / environment / loggingRules).
@@ -316,8 +467,10 @@ class QmlRuntime extends EventTarget {
             accessibility: config.accessibility ?? false,
         };
 
-        // Use hot reload for loadProject() when the instance offers it. May be
-        // flipped at any time; see hotReloadAvailable.
+        /**
+         * Use hot reload in {@link loadProject} when {@link hotReloadAvailable} is `true`. Can be changed at any time.
+         * @type {boolean}
+         */
         this.hotReload = config.hotReload ?? false;
         this._lastLoad = null;          // { entry, files, ok, hot } of the last loadProject
         this._lastRoot = null;          // root state after the last usable load (health baseline)
@@ -325,6 +478,10 @@ class QmlRuntime extends EventTarget {
         this._hotMessages = null;       // collects service messages while one is in flight
 
         this._id = null;
+        /**
+         * `true` from {@link load} resolving until {@link destroy}.
+         * @type {boolean}
+         */
         this.ready = false;
         this._loadStartTime = null;
 
@@ -334,17 +491,26 @@ class QmlRuntime extends EventTarget {
         this._pendingResize = false;
     }
 
-    // Compatibility: expose the build mode (used to be a field).
+    /** Build mode of the view's instance. @type {'static'|'shared'} */
     get mode() { return this._instance ? this._instance.mode : this._instanceConfig.mode; }
 
-    // True once the instance's QmlPreview service has confirmed in-place
-    // updates. Requires the instance to have been created with
-    // `hotReload: true`; there is no enabling it after the fact.
+    /**
+     * `true` when the instance's QmlPreview service accepts in-place updates.
+     * Requires an instance created with `hotReload: true`; it cannot be
+     * enabled later.
+     * @type {boolean}
+     */
     get hotReloadAvailable() { return !!this._instance?.hotReload; }
 
-    // True when the instance was started with accessibility enabled.
+    /** Whether the instance exposes the scene to screen readers. @type {boolean} */
     get accessibility() { return !!(this._instance?.accessibility ?? this._instanceConfig.accessibility); }
 
+    /**
+     * Loads the instance if needed, then creates the view's window in
+     * {@link container}. Emits `loading` first and `ready` on success. On
+     * failure emits `error` and rejects.
+     * @returns {Promise<void>}
+     */
     async load() {
         this._loadStartTime = performance.now();
         this._emit('loading');
@@ -384,6 +550,10 @@ class QmlRuntime extends EventTarget {
         }
     }
 
+    /**
+     * Destroys the view: removes its window and project files, empties
+     * {@link container}, and destroys the instance if the view owns it.
+     */
     destroy() {
         if (this._resizeObserver) {
             this._resizeObserver.disconnect();
@@ -408,10 +578,12 @@ class QmlRuntime extends EventTarget {
         }
     }
 
-    // Pause / resume forwarding resize events to Qt. While paused the canvas
-    // backing buffer is left untouched (CSS stretches the existing pixels), so
-    // an in-flight splitter drag doesn't flicker black. Resume replays a
-    // pending resize, if any.
+    /**
+     * Pauses or resumes forwarding container size changes to Qt. While paused
+     * the canvas keeps its backing store and is stretched by CSS, which avoids
+     * flicker during a splitter drag. Resuming applies a pending resize.
+     * @param {boolean} enabled
+     */
     setResizeEnabled(enabled) {
         if (this._resizeEnabled === enabled) return;
         this._resizeEnabled = enabled;
@@ -421,34 +593,57 @@ class QmlRuntime extends EventTarget {
         }
     }
 
-    // Set how the root item is sized: fill the canvas on an axis, or keep the
-    // item's implicit size and center it. Set before loadQml.
+    /**
+     * Sets how the root item is sized on each axis: stretched to the window
+     * (`true`), or kept at its implicit size and centered (`false`). Default
+     * is `true` for both. Applies to the current root and to later loads. No
+     * effect before `ready`.
+     * @param {boolean} fillWidth
+     * @param {boolean} fillHeight
+     */
     setSizeMode(fillWidth, fillHeight) {
         if (this.ready)
             this._instance._setSizeMode(this._id, fillWidth, fillHeight);
     }
 
-    // Force the color scheme for this view's instance (process-global).
+    /**
+     * Forces the color scheme of the view's instance. Affects every view
+     * sharing the instance.
+     * @param {'light'|'dark'|'auto'} scheme - `auto` follows the system.
+     */
     setColorScheme(scheme) {
         this._instance?.setColorScheme(scheme);
     }
 
+    /**
+     * Loads a QML document from a string, replacing the current scene.
+     * Completion is reported by `qmlloaded`, problems by `error` and
+     * `warning`. The document has no URL, so relative imports do not resolve
+     * and hot reload does not apply; use {@link loadProject} for those.
+     * @param {string} source - QML source.
+     * @throws {Error} When called before `ready`.
+     */
     loadQml(source) {
         if (!this.ready) throw new Error('Runtime not ready');
         this._lastLoad = null;   // a setData() document has no URL to hot reload
         this._instance._loadQml(this._id, source);
     }
 
-    // Load a QmlProject. Writes every file into Emscripten's in-memory FS
-    // under this view's directory, then asks the runtime to load the entry
-    // file from that path. Lets Qt resolve cross-file imports, qmldir, and
-    // relative refs through normal filesystem plumbing.
-    //
-    // With hot reload on and available, a project that differs from the last
-    // one only in the contents of some files is patched in place instead: the
-    // changed documents are recompiled and the live objects keep their state.
-    // Anything else — the first load, another entry, added or removed files,
-    // a patch the service cannot apply — is a full load.
+    /**
+     * Loads a project: writes its files to the in-memory filesystem, in a
+     * directory private to this view, and loads the entry file from there.
+     * Imports between files, `qmldir` and relative URLs resolve as on disk.
+     *
+     * When {@link hotReload} and {@link hotReloadAvailable} are both `true`
+     * and the project differs from the previous load only in file contents,
+     * the changed documents are recompiled and patched into the running scene,
+     * and live objects keep their state. Everything else is a full load: the
+     * first load, a different entry file, added or removed files, an unchanged
+     * project, or a patch the service rejects. The `qmlloaded` detail tells
+     * which happened.
+     * @param {import('./qmlproject.js').QmlProject} project
+     * @throws {Error} When called before `ready`.
+     */
     loadProject(project) {
         if (!this.ready) throw new Error('Runtime not ready');
         const FS = this._instance.module.FS;
@@ -568,6 +763,10 @@ class QmlRuntime extends EventTarget {
         this._emit('qmlloaded', { hot: false });
     }
 
+    /**
+     * Returns the errors and warnings of the last load. Empty before `ready`.
+     * @returns {QmlIssue[]}
+     */
     getErrors() {
         if (!this.ready) return [];
         if (this._lastLoad?.hot)
@@ -579,6 +778,7 @@ class QmlRuntime extends EventTarget {
         }
     }
 
+    /** Removes the loaded scene. */
     clear() {
         if (this.ready)
             this._instance._clearContent(this._id);
@@ -588,9 +788,16 @@ class QmlRuntime extends EventTarget {
         this.dispatchEvent(new CustomEvent(type, { detail }));
     }
 
+    /**
+     * Adds a listener that receives the event's `detail`. See the class
+     * description for the events.
+     * @param {string} event
+     * @param {(detail: any) => void} callback
+     * @returns {this}
+     */
     on(event, callback) {
         this.addEventListener(event, (e) => callback(e.detail));
-        return this; // Allow chaining
+        return this;
     }
 }
 

@@ -1,4 +1,8 @@
-// QmlPlayground - Self-contained QML playground component with Shadow DOM
+/**
+ * The playground front-end: editor, live preview, console, examples and
+ * settings as one component.
+ * @module qmlplayground
+ */
 
 import { QmlRuntime } from './qmlruntime.js';
 import { QmlEditor } from './qmleditor.js';
@@ -15,27 +19,72 @@ import {
 } from './qmlaiui.js';
 import { QMLAI_DEFAULT_MODEL, OPENROUTER_DEFAULT_MODEL } from './qmlai.js';
 
+/**
+ * An entry in the examples index (`examples/index.json`).
+ * @typedef {Object} Example
+ * @property {string} name - Display name.
+ * @property {string} [file] - Single-file example: QML file, relative to the index.
+ * @property {string} [project] - Multi-file example: `qmlplayground/project/v1` JSON file, relative to the index.
+ * @property {boolean} [experimental] - Listed only when experimental examples are enabled in settings.
+ */
 
+/**
+ * The QML playground as one component: code editor, live preview, console,
+ * examples menu and settings dialog, rendered into a shadow root on the host
+ * element.
+ *
+ * ```js
+ * const playground = new QmlPlayground(document.getElementById('playground'));
+ * playground.on('ready', ({ loadTime }) => console.log(`ready in ${loadTime} ms`));
+ * await playground.init();
+ * ```
+ *
+ * Settings (build mode, theme, hot reload, accessibility, experimental
+ * examples, logging rules) are stored in `localStorage`, read when the
+ * playground is created, and exposed by the static getters.
+ *
+ * Connect to each event using the {@link QmlPlayground.on | on} method, which
+ * passes the event's `detail` to the callback. Issues have the shape of
+ * {@link qmlruntime!QmlIssue | QmlIssue}.
+ *
+ * | Event | Detail | When |
+ * |---|---|---|
+ * | `editorready` | none | The editor is initialized |
+ * | `loading` | none | The Qt runtime starts loading |
+ * | `ready` | `{ loadTime, qtVersion }` | The runtime is ready; the editor content is run |
+ * | `running` | none | A run started |
+ * | `qmlloaded` | none | A run finished, before its issues are reported |
+ * | `error` | `{ line, column, message }` | A QML error, or a playground error: runtime not ready, example not found, fetch failed |
+ * | `warning` | `{ line, column, message }` | A QML warning |
+ * | `errors` | `{ errors, warnings }` | A run finished with errors |
+ * | `warnings` | `{ warnings }` | A run finished with warnings only |
+ * | `success` | none | A run finished without issues |
+ * | `examplesloaded` | `{ examples }` | The examples index is loaded |
+ * | `exampleloaded` | `{ example, source }` | An example was loaded into the editor; `source` only for single-file examples |
+ */
 class QmlPlayground extends EventTarget {
+    /** Build mode from settings. @returns {'static'|'shared'} */
     static getBuildMode() {
         return localStorage.getItem('qmlplayground-build-mode') || 'static';
     }
 
+    /** Theme from settings. @returns {'dark'|'light'|'system'} */
     static getTheme() {
         return localStorage.getItem('qmlplayground-theme') || 'dark';
     }
 
+    /** Whether the examples menu lists experimental examples. @returns {boolean} */
     static getExperimentalExamples() {
         return localStorage.getItem('qmlplayground-experimental-examples') === 'true';
     }
 
-    // Hot reload: patch the running scene in place on edits (default on).
+    /** Whether hot reload is enabled in settings. Default `true`. @returns {boolean} */
     static getHotReload() {
         const stored = localStorage.getItem('qmlplayground-hot-reload');
         return stored === null ? true : stored === 'true';
     }
 
-    // Accessibility: expose the scene to screen readers (default on).
+    /** Whether accessibility is enabled in settings. Default `true`. @returns {boolean} */
     static getAccessibility() {
         const stored = localStorage.getItem('qmlplayground-accessibility');
         return stored === null ? true : stored === 'true';
@@ -81,23 +130,47 @@ class QmlPlayground extends EventTarget {
         document.head.appendChild(style);
     }
 
+    /**
+     * Builds the playground UI in a shadow root on `container`. Call
+     * {@link init} to start the editor and runtime.
+     * @param {HTMLElement} [container=document.body] - Host element. Gets a `data-theme` attribute of `light` or `dark`.
+     */
     constructor(container) {
         super();
+        /** Host element. @type {HTMLElement} */
         this.container = container || document.body;
+        /** Shadow root holding the playground DOM. @type {ShadowRoot} */
         this.shadow = this.container.attachShadow({ mode: 'open' });
+        /** Build mode in use. @type {'static'|'shared'} */
         this.buildMode = QmlPlayground.getBuildMode();
+        /** Theme in use. @type {'dark'|'light'|'system'} */
         this.theme = QmlPlayground.getTheme();
 
         // Options
+        /**
+         * URL of the examples index. Example files resolve relative to it. Set before {@link init}.
+         * @type {string}
+         */
         this.examplesUrl = 'examples/index.json';
+        /** Run the project on editor changes. An edit made during a run is run once that run completes. @type {boolean} */
         this.autoRun = true;
         this.autoRunDelay = 500;
 
         // Internal state
+        /**
+         * The preview runtime. `null` until {@link init}.
+         * @type {?QmlRuntime}
+         */
         this.runtime = null;
+        /**
+         * The code editor. `null` until {@link init}.
+         * @type {?QmlEditor}
+         */
         this.editor = null;
+        /** The project being edited. @type {QmlProject} */
         this.project = new QmlProject({ entry: 'Main.qml' });
-        this.activePath = this.project.entry; // file currently shown in the editor
+        /** Path of the project file shown in the editor. @type {string} */
+        this.activePath = this.project.entry;
         const activeModelId = getAIModel();
         const activeProvider = providerForModelId(activeModelId);
         this.ai = new QmlAI({
@@ -893,7 +966,11 @@ class QmlPlayground extends EventTarget {
         // (AI elements are queried by QmlAIUI after it mounts.)
     }
 
-    // Initialize the playground
+    /**
+     * Starts the playground: initializes the editor and UI, loads the Qt
+     * runtime, fetches the examples index and loads the `hello.qml` example.
+     * @returns {Promise<this>}
+     */
     async init() {
         await this._initEditor();
         this._initUI();
@@ -1326,7 +1403,11 @@ class QmlPlayground extends EventTarget {
         this.containerElement?.classList.add('qt-ready');
     }
 
-    // Logging to console
+    /**
+     * Appends a timestamped line to the console pane.
+     * @param {string} message - Inserted as HTML.
+     * @param {'info'|'success'|'warn'|'error'} [type='info'] - Styles the line.
+     */
     log(message, type = 'info') {
         if (!this.consoleElement) return;
 
@@ -1344,8 +1425,7 @@ class QmlPlayground extends EventTarget {
         this.consoleElement.scrollTop = this.consoleElement.scrollHeight;
     }
 
-    // Get/set editor content. The QmlProject mirrors the editor; for now
-    // there is one file (the entry) so getValue reads either.
+    /** Returns the editor content. @returns {string} */
     getValue() {
         return this.editor?.getValue() ?? '';
     }
@@ -1355,15 +1435,25 @@ class QmlPlayground extends EventTarget {
         this.project.setFileContent(this.activePath, source);
     }
 
+    /**
+     * Replaces the editor content and the active project file. Does not
+     * trigger auto-run.
+     * @param {string} source
+     */
     setValue(source) {
         this._setValue(source);
     }
 
+    /** Returns the project being edited. @returns {QmlProject} */
     getProject() {
         return this.project;
     }
 
-    // Run the current project (entry file resolved through MEMFS).
+    /**
+     * Runs the project in the preview. Emits `running`, then when the load
+     * completes `qmlloaded` followed by one of `success`, `warnings` or
+     * `errors`. Emits `error` and returns if the runtime is not ready.
+     */
     run() {
         if (!this.runtime?.ready) {
             this._emit('error', { line: 0, column: 0, message: 'Runtime not ready' });
@@ -1439,12 +1529,16 @@ class QmlPlayground extends EventTarget {
         this.editor?.clearMarkers();
     }
 
-    // Refresh editor layout
+    /** Re-lays out the editor, e.g. after its container changed size. */
     refresh() {
         this.editor?.refresh();
     }
 
-    // Load examples index
+    /**
+     * Fetches the examples index from {@link examplesUrl} and rebuilds the
+     * examples menu. Emits `examplesloaded`, or `error` if the fetch fails.
+     * @returns {Promise<Example[]>} The examples; empty on failure.
+     */
     async loadExamples() {
         if (!this.examplesUrl) return [];
 
@@ -1494,6 +1588,7 @@ class QmlPlayground extends EventTarget {
         }
     }
 
+    /** Returns the examples loaded by {@link loadExamples}. @returns {Example[]} */
     getExamples() {
         return this._examples;
     }
@@ -1501,9 +1596,14 @@ class QmlPlayground extends EventTarget {
     // ---- AI mode ----
 
 
-    // Load a specific example by name or file. Examples can be single-file
-    // (entry has "file") or multi-file projects (entry has "project" with a
-    // path to a v1 project.json).
+    /**
+     * Loads an example into the editor and runs it. A single-file example
+     * becomes a one-file project; a project example replaces the whole project
+     * and shows the file tree. Emits `exampleloaded`, or `error` if the
+     * example is unknown or cannot be fetched.
+     * @param {string} nameOrFile - The example's `name`, `file` or `project`.
+     * @returns {Promise<void>}
+     */
     async loadExample(nameOrFile) {
         const example = this._examples.find(e =>
             e.name === nameOrFile || e.file === nameOrFile || e.project === nameOrFile);
@@ -1553,8 +1653,11 @@ class QmlPlayground extends EventTarget {
         this.editor?.setValue(this.project.getFileContent(this.activePath), { silent: true });
     }
 
-    // Make `path` the file the editor is editing. Saves any pending edits to
-    // the previously-active file first.
+    /**
+     * Shows a project file in the editor. Pending edits to the current file
+     * are saved to the project first. Paths not in the project are ignored.
+     * @param {string} path
+     */
     setActiveFile(path) {
         if (path === this.activePath) return;
         if (!this.project.hasFile(path)) return;
@@ -1596,7 +1699,13 @@ class QmlPlayground extends EventTarget {
         this.dispatchEvent(new CustomEvent(type, { detail }));
     }
 
-    // Convenience event listener
+    /**
+     * Adds a listener that receives the event's `detail`. See the class
+     * description for the events.
+     * @param {string} event
+     * @param {(detail: any) => void} callback
+     * @returns {this}
+     */
     on(event, callback) {
         this.addEventListener(event, (e) => callback(e.detail));
         return this;

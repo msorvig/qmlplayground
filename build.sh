@@ -15,11 +15,12 @@ BUILD_STATIC="$SCRIPT_DIR/build-wasm"
 BUILD_SHARED="$SCRIPT_DIR/build-wasm-shared"
 
 usage() {
-    echo "Usage: $0 [static|shared|all|deploy] [--clean] [--debug] [--opt] [--copy-qt]"
+    echo "Usage: $0 [static|shared|all|deploy|docs] [--clean] [--debug] [--opt] [--copy-qt]"
     echo "  static    - Build static (monolithic) variant"
     echo "  shared    - Build shared (dynamic linking) variant"
     echo "  all       - Build both variants (default)"
-    echo "  deploy    - Build and deploy both variants"
+    echo "  deploy    - Build and deploy both variants, plus the API docs"
+    echo "  docs      - Generate the JS API docs (TypeDoc) into dist/api"
     echo "  --clean   - Remove build directories before building"
     echo "  --debug   - Debug build (dwarf debug info + source maps)"
     echo "  --opt     - Run wasm-opt on deployed wasm (slow)"
@@ -104,6 +105,18 @@ copy_qt() {
     done
 }
 
+deploy_docs() {
+    if ! command -v npm >/dev/null 2>&1; then
+        echo "Skipping API docs (npm not found)"
+        return
+    fi
+    echo "=== Generating API docs ==="
+    if [ ! -d "$SCRIPT_DIR/node_modules/typedoc" ]; then
+        (cd "$SCRIPT_DIR" && npm ci)
+    fi
+    (cd "$SCRIPT_DIR" && npx typedoc --out "$DEPLOY_DIR/api")
+}
+
 clean() {
     echo "=== Cleaning build directories ==="
     rm -rf "$BUILD_STATIC" "$BUILD_SHARED"
@@ -137,7 +150,8 @@ case "$TARGET" in
     static)  build_static ;;
     shared)  build_shared ;;
     all)     build_static; build_shared ;;
-    deploy)  deploy_static; deploy_shared ;;
+    deploy)  deploy_static; deploy_shared; deploy_docs ;;
+    docs)    deploy_docs ;;
     --clean|--debug|--opt|--copy-qt) ;;
     *)       usage ;;
 esac

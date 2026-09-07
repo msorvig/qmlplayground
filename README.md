@@ -438,6 +438,7 @@ export QT_SHARED_PREFIX=/path/to/qt/wasm-shared/qtbase
 ./build.sh static              # build static only
 ./build.sh shared              # build shared only
 ./build.sh deploy --clean      # clean build dirs first
+./build.sh docs                # generate the JS API docs only
 ```
 
 Either variable can be omitted to skip that variant. By default, the shared
@@ -459,6 +460,20 @@ cmake --build build-wasm --target deploy
 cmake --build build-wasm-shared --target deploy
 ```
 
+### API documentation
+
+The JS API reference is generated with [TypeDoc](https://typedoc.org) from
+the JSDoc comments in `src/qmlruntime.js` and
+`src/frontend/playground/qmlplayground.js`. `build.sh deploy` generates it
+into `dist/api/`; to generate it alone:
+
+```bash
+./build.sh docs
+```
+
+This installs TypeDoc into `node_modules/` on first use. `npm run docs` does
+the same without the wrapper.
+
 ### Deploy layout
 
 Both front-ends' pages sit at the dist root, beside `static/` and `shared/`,
@@ -478,6 +493,7 @@ dist/
   codemirror.min.js/css
   titillium-web/          Bundled fonts (woff2)
   examples/
+  api/                    Generated JS API docs (TypeDoc)
   static/                 Static runtime build
     qmlruntime_wasm.js
     qmlruntime_wasm.wasm

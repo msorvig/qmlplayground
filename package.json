@@ -1,0 +1,12 @@
+{
+  "name": "qmlplayground",
+  "private": true,
+  "description": "Browser-based QML editor and runtime on Qt for WebAssembly",
+  "scripts": {
+    "docs": "typedoc"
+  },
+  "devDependencies": {
+    "typedoc": "^0.28.0",
+    "typescript": "^5.6.0"
+  }
+}
