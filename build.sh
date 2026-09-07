@@ -82,6 +82,13 @@ deploy_static() {
 deploy_shared() {
     build_shared || return
     echo "=== Deploying shared ==="
+    # The deploy target symlinks shared/qt/{lib,plugins,qml} to the Qt install
+    # and cannot replace the real directories a previous --copy-qt left there.
+    for dir in lib plugins qml; do
+        if [ -d "$DEPLOY_DIR/shared/qt/$dir" ] && [ ! -L "$DEPLOY_DIR/shared/qt/$dir" ]; then
+            rm -rf "$DEPLOY_DIR/shared/qt/$dir"
+        fi
+    done
     cmake --build "$BUILD_SHARED" --target deploy
     if $OPT; then
         cmake --build "$BUILD_SHARED" --target deploy-opt
@@ -91,17 +98,18 @@ deploy_shared() {
     fi
 }
 
+# Copy the runtime parts of the Qt install into the deploy, replacing the
+# symlinks. Static archives, link metadata and the CMake/pkg-config packages
+# are build-time only and are left out.
 copy_qt() {
     local qt_dir="$DEPLOY_DIR/shared/qt"
     echo "=== Copying Qt libs (replacing symlinks) ==="
     for dir in lib plugins qml; do
-        if [ -L "$qt_dir/$dir" ]; then
-            rm "$qt_dir/$dir"
-            cp -R "$QT_SHARED_PREFIX/$dir" "$qt_dir/$dir"
-        elif [ -d "$qt_dir/$dir" ]; then
-            rm -rf "$qt_dir/$dir"
-            cp -R "$QT_SHARED_PREFIX/$dir" "$qt_dir/$dir"
-        fi
+        rm -rf "$qt_dir/$dir"
+        rsync -a \
+            --exclude '*.a' --exclude '*.prl' \
+            --exclude 'cmake/' --exclude 'pkgconfig/' \
+            "$QT_SHARED_PREFIX/$dir/" "$qt_dir/$dir/"
     done
 }
 
